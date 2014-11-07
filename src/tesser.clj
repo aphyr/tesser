@@ -214,6 +214,89 @@
 ; *sequences* of transforms and return sequences of transforms. If no sequence
 ; is provides, they construct a new single-element sequence.
 
+;; Compiling and executing folds
+
+(defn assert-compiled-fold
+  "Is this a valid compiled fold?"
+  [f]
+  (assert (fn? (:identity f)) (str (pr-str f) " is missing an :identity fn"))
+  (assert (fn? (:reducer f))  (str (pr-str f) " is missing a :reducer fn"))
+  (assert (fn? (:post-reducer f))
+          (str (pr-str f) " is missing a :post-reducer fn"))
+  (assert (fn? (:combiner f)) (str (pr-str f) " is missing a :combiner fn"))
+  (assert (fn? (:post-combiner f))
+          (str (pr-str f) " is missing a :post-combiner fn"))
+  f)
+
+(defn compile-fold
+  "Compiles a fold (a sequence of transforms, each represented as a function
+  taking the next transform) to a single map like
+
+  {:identity (fn [] ...),
+   :reducer  (fn [acc x] ...)
+   ...}"
+  [fold]
+  (->> fold
+       reverse
+       (reduce (fn [compiled adhere] (adhere compiled))
+               nil)
+       assert-compiled-fold))
+
+(defn tesser
+  "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
+  num-procs * 2 threads for the parallel (reducer) portion of the fold."
+  [seqs fold]
+  (let [fold    (compile-fold fold)
+        t0      (System/nanoTime)
+        threads (* 2 (.. Runtime getRuntime availableProcessors))
+        queue   (atom seqs)
+        results (atom [])
+        chunks  (atom 0)
+        stats   (measure/periodically 1 (println @chunks "chunks read"))]
+    (try
+      (let [workers (->> threads
+                         core/range
+                         (core/map
+                           (fn worker [i]
+                             (future
+                               (while
+                                 (when-let [seq (poll! queue)]
+                                   (let [result (->> seq
+                                                     (reduce (:reducer fold)
+                                                             ((:identity fold)))
+                                                     ((:post-reducer fold)))]
+                                     (swap! results conj result)
+                                     (swap! chunks inc)
+                                     true)))))))]
+        (try
+          ; Wait for workers
+          (core/mapv deref workers)
+
+          ; Stop printing stats
+          (stats)
+
+          (let [out   (->> results
+                           deref
+                           (reduce (:combiner fold) ((:identity fold)))
+                           ((:post-combiner fold)))
+                t1    (System/nanoTime)]
+            (when (< 1e8 (- t1 t0))
+              (println (format "Time: %.2f seconds" (/ (- t1 t0) 1e9))))
+            out)
+
+          (finally
+            ; Ensure workers are dead
+            (core/mapv future-cancel workers))))
+
+      (finally
+        ; Stop printing stats
+        (stats)
+
+        ; Force seq realization so we can close filehandles
+        (dorun seqs)))))
+
+
+; Defining transforms
 
 (defmacro deftransform
   "We're trying to build functions that look like...
@@ -309,9 +392,13 @@
 ;; Splitting folds
 
 (deftransform facet
-  "Generalizes a fold over a single value to operate on maps of keys to those
-  values. Each key gets an independent instance of the fold. For instance, say
-  you have inputs like
+  "Your inputs are maps, and you want to apply a fold to each value
+  independently. Facet generalizes a fold over a single value to operate on
+  maps of keys to those values, returning a map of keys to the results of the
+  fold over all values for that key. Each key gets an independent instance of
+  the fold.
+
+  For instance, say you have inputs like
 
   {:x 1, :y 2}
   {}
@@ -344,6 +431,64 @@
    :post-combiner (fn post-combiner [m]
                     (map-vals post-combiner- m))})
 
+(deftransform fuse
+  "You've got several folds, and want to execute them in one pass. Fuse is the
+  function for you! It takes a map from keys to folds, like
+
+    (->> (map parse-person)
+         (fuse {:age-range    (->> (map :age) (range))
+                :colors-prefs (->> (map :favorite-color) (frequencies))})
+         (tesser people))
+
+  And returns a map from those same keys to the results of the corresponding
+  folds:
+
+    {:age-range   [0 74],
+     :color-prefs {:red        120
+                   :blue       312
+                   :watermelon 1953
+                   :imhotep    1}}
+
+  Note that this fold only invokes `parse-person` once for each record, and
+  completes in a single pass. If we ran the age and color folds independently,
+  it'd take two passes over the dataset--and require parsing every person
+  *twice*.
+
+  Fuse and facet both return maps, but generalize over different axes. Fuse
+  applies a fixed set of *independent* folds over the *same* inputs, where
+  facet applies the *same* fold to a dynamic set of keys taken from the
+  inputs.
+
+  Note that fuse compiles the folds you pass to it, so you need to build them
+  completely *before* fusing. The fold `fuse` returns can happily be combined
+  with other transformations at its level, but its internal folds are sealed
+  and opaque."
+  [fold-map]
+  (assert (nil? downstream))
+  (let [ks             (vec (keys fold-map))
+        folds          (mapv (comp compile-fold (partial get fold-map)) ks)
+        reducers       (core/map :reducer folds)
+        combiners      (core/map :combiner folds)]
+    ; We're gonna project into a particular key basis vector for the
+    ; reduce/combine steps
+    {:identity      (if (empty? fold-map)
+                       (constantly []) ; juxt can't take zero args
+                       (apply juxt (core/map :identity folds)))
+      :reducer       (fn reducer [accs x]
+                       (mapv (fn [f acc] (f acc x))
+                             reducers accs))
+      :post-reducer  identity
+      :combiner      (fn combiner [accs1 accs2]
+                       (mapv (fn [f acc1 acc2] (f acc1 acc2))
+                             combiners accs1 accs2))
+     ; Then inflate the vector back into a map
+     :post-combiner (comp (partial zipmap ks)
+                          ; After having applied the post-combiners
+                          (fn post-com [xs] (mapv (fn [f x] (f x))
+                                                  (core/map :post-combiner
+                                                            folds)
+                                                  xs)))}))
+
 ;; Numeric folds
 
 (deftransform sum
@@ -368,70 +513,3 @@
    :post-combiner (fn post-combiner [x]
                     (double (/ (first x) (max 1 (last x)))))})
 
-;; Compiling and executing folds
-
-(defn compile-fold
-  "Compiles a fold (a sequence of transforms, each represented as a function
-  taking the next transform) to a single map like
-
-  {:identity (fn [] ...),
-   :reducer  (fn [acc x] ...)
-   ...}"
-  [fold]
-  (->> fold
-       reverse
-       (reduce (fn [compiled adhere] (adhere compiled))
-               nil)))
-
-(defn tesser
-  "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
-  num-procs * 2 threads for the parallel (reducer) portion of the fold."
-  [seqs fold]
-  (let [fold    (compile-fold fold)
-        t0      (System/nanoTime)
-        threads (* 2 (.. Runtime getRuntime availableProcessors))
-        queue   (atom seqs)
-        results (atom [])
-        chunks  (atom 0)
-        stats   (measure/periodically 1 (println @chunks "chunks read"))]
-    (try
-      (let [workers (->> threads
-                         core/range
-                         (core/map
-                           (fn worker [i]
-                             (future
-                               (while
-                                 (when-let [seq (poll! queue)]
-                                   (let [result (->> seq
-                                                     (reduce (:reducer fold)
-                                                             ((:identity fold)))
-                                                     ((:post-reducer fold)))]
-                                     (swap! results conj result)
-                                     (swap! chunks inc)
-                                     true)))))))]
-        (try
-          ; Wait for workers
-          (core/mapv deref workers)
-
-          ; Stop printing stats
-          (stats)
-
-          (let [out   (->> results
-                           deref
-                           (reduce (:combiner fold) ((:identity fold)))
-                           ((:post-combiner fold)))
-                t1    (System/nanoTime)]
-            (when (< 1e8 (- t1 t0))
-              (println (format "Time: %.2f seconds" (/ (- t1 t0) 1e9))))
-            out)
-
-          (finally
-            ; Ensure workers are dead
-            (core/mapv future-cancel workers))))
-
-      (finally
-        ; Stop printing stats
-        (stats)
-
-        ; Force seq realization so we can close filehandles
-        (dorun seqs)))))

@@ -122,6 +122,19 @@
                             flatten1
                             (apply merge-with + {}))))))
 
+(defspec fuse-spec
+  test-count
+  ; sum, set, and multiset over ints
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [inputs (flatten1 chunks)]
+                  (is (= (->> (t/fuse {:sum      (t/sum)
+                                       :set      (t/into #{})
+                                       :multiset (t/into (multiset))})
+                              (t/tesser chunks))
+                         {:sum      (reduce + inputs)
+                          :set      (set inputs)
+                          :multiset (into (multiset) inputs)})))))
+
 ;; Numeric folds
 
 (defspec sum-spec
