@@ -6,6 +6,7 @@
                                 [generators :as gen]
                                 [properties :as prop]]
             [multiset.core :refer [multiset]]
+            [tesser.utils :refer :all]
             [tesser :as t]))
 
 (def test-count
@@ -143,10 +144,29 @@
                 (is (= (t/tesser chunks (t/sum))
                         (reduce + 0 (flatten1 chunks))))))
 
+(defn mean
+  [coll]
+  (assert (not (empty? coll)))
+  (/ (reduce + coll) (count coll)))
+
 (defspec mean-spec
   test-count
   (prop/for-all [chunks (gen/such-that (partial some not-empty)
                                        (chunks gen/int))]
-                (let [inputs (flatten1 chunks)]
-                  (is (== (t/tesser chunks (t/mean))
-                          (/ (reduce + inputs) (count inputs)))))))
+                (is (== (t/tesser chunks (t/mean))
+                        (mean (flatten1 chunks))))))
+
+
+(defn variance
+  [coll]
+  (/ (->> coll
+          (map #(expt (- % (mean coll)) 2))
+          (reduce +))
+     (max (dec (count coll)) 1)))
+
+(defspec variance-spec
+  test-count
+  (prop/for-all [chunks (gen/such-that (partial some not-empty)
+                                       (chunks gen/int))]
+                (=ish (t/tesser chunks (t/variance))
+                      (variance (flatten1 chunks)))))

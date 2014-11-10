@@ -502,7 +502,7 @@
    :post-combiner core/identity})
 
 (deftransform mean
-  "Finds the arithmetic mean of numeric elements."
+  "Finds the arithmetic mean of numeric inputs."
   []
   (assert (nil? downstream))
   {:identity      (constantly [0 0])
@@ -512,4 +512,26 @@
    :combiner      (fn combiner [x y] (core/map + x y))
    :post-combiner (fn post-combiner [x]
                     (double (/ (first x) (max 1 (last x)))))})
+
+(deftransform variance
+  "Unbiased variance estimation. Given numeric inputs, returns their variance."
+  []
+  (assert (nil? downstream))
+  {:identity (constantly [0 0 0])
+   :reducer (fn count-mean-sq [[count mean sum-of-squares] x]
+              (let [count' (inc count)
+                    mean'  (+ mean (/ (- x mean) count'))]
+                [count'
+                 mean'
+                 (+ sum-of-squares (* (- x mean') (- x mean)))]))
+   :post-reducer identity
+   :combiner (fn partcmsq [[c m sq] [c2 m2 sq2]]
+               (let [count (+ c c2)]
+                 (if (zero? count)
+                   [c m sq]
+                   [count
+                    (/ (+ (* c m) (* c2 m2)) count)
+                    (+ sq sq2 (/ (* (- m2 m) (- m2 m) c c2) count))])))
+   :post-combiner (fn vardiv [x] (double (/ (last x) (max 1 (dec (first x))))))})
+
 
