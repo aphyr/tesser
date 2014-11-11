@@ -193,3 +193,24 @@
                                        (chunks gen/int))]
                 (=ish (t/tesser chunks (t/standard-deviation))
                       (sqrt (variance (flatten1 chunks))))))
+
+(defn covariance
+  [fx fy coll]
+  (let [coll (filter fx (filter fy coll))]
+    (if (empty? coll)
+      nil
+      (let [mean-x (mean (map fx coll))
+            mean-y (mean (map fy coll))]
+        (double (/ (reduce + (map #(* (- (fx %) mean-x)
+                                      (- (fy %) mean-y))
+                                  coll))
+                   (max (dec (count coll)) 1)))))))
+
+(defspec covariance-spec
+  test-count
+  ; Take maps like {}, {:x 1}, {:x 2 :y 3} and compute covariance
+  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y])
+                                         gen/int))]
+                (is (= (->> (t/covariance :x :y)
+                            (t/tesser chunks))
+                       (covariance :x :y (flatten1 chunks))))))

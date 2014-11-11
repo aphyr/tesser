@@ -573,3 +573,38 @@
   [& [downstream]]
   (->> downstream (variance) (post-combine sqrt)))
 
+(deftransform covariance
+  "Given two functions of an input (fx input) and (fy input), each of which
+  returns a number, estimates the unbiased covariance of those functions over
+  inputs.
+
+  Ignores any inputs where (fx input) or (fy input) are nil. If no inputs have
+  both x and y, returns nil."
+  [fx fy]
+  (assert (nil? downstream))
+  {:identity (constantly [0 0 0 0])
+   :reducer (fn count-mean2-sq [[count meanx meany sum-of-squares
+                                 :as current-state] elt]
+              (let [x (fx elt)
+                    y (fy elt)]
+                (if (or (nil? x) (nil? y))
+                  current-state
+                  (let [count' (inc count)
+                        meanx'  (+ meanx (/ (- x meanx) count'))
+                        meany'  (+ meany (/ (- y meany) count'))]
+                    [count'
+                     meanx'
+                     meany'
+                     (+ sum-of-squares (* (- x meanx') (- y meany)))]))))
+   :post-reducer identity
+   :combiner (fn partcm2sq [[c mx my sq :as current-state] [c2 mx2 my2 sq2]]
+               (let [count (+ c c2)]
+                 (if (zero? count)
+                   current-state
+                   [count
+                    (/ (+ (* c mx) (* c2 mx2)) count)
+                    (/ (+ (* c my) (* c2 my2)) count)
+                    (+ sq sq2 (/ (* (- mx2 mx) (- my2 my) c c2) count))])))
+   :post-combiner (fn vardiv [[c _ _ sq]]
+                    (when (pos? c) ; Return nil if no inputs
+                      (double (/ sq (max 1 (dec c))))))})
