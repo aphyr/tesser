@@ -298,7 +298,7 @@
 
 ; Defining transforms
 
-(defmacro deftransform
+(defmacro deftransform*
   "We're trying to build functions that look like...
 
     (defn map
@@ -315,24 +315,31 @@
   Which involves a fair bit of shared boilerplate: the single-arity variant of
   the transform, the append/prepend logic, the annealing function and its
   destructuring bind, etc. We'll wrap these up in an anaphoric macro called
-  `deftransform`. Within the body, `identity-`, `reducer-`, `post-reducer-`,
-  `combiner-`, `post-combiner-` are all bound to the downstream transform's
-  component functions, and `downstream` is bound to the downstream transform
-  itself."
-  [name docstring args & body]
+  `deftransform`, which takes a function (e.g. `append`) to conjoin this
+  transform with the fold. Within the body, `identity-`, `reducer-`,
+  `post-reducer-`, `combiner-`, `post-combiner-` are all bound to the
+  downstream transform's component functions, and `downstream` is bound to the
+  downstream transform itself."
+  [conjoiner name docstring args & body]
   `(defn ~name ~docstring
      ; Version without fold argument
      ([~@args] (~name ~@args []))
      ; Version with fold argument
      ([~@args fold#]
-      (append fold#
-              (fn adhere [~'downstream]
-                (let ~'[identity-      (:identity downstream)
-                        reducer-       (:reducer downstream)
-                        post-reducer-  (:post-reducer downstream)
-                        combiner-      (:combiner downstream)
-                        post-combiner- (:post-combiner downstream)]
-                  ~@body))))))
+      (~conjoiner fold#
+                  (fn adhere [~'downstream]
+                    (let ~'[identity-      (:identity downstream)
+                            reducer-       (:reducer downstream)
+                            post-reducer-  (:post-reducer downstream)
+                            combiner-      (:combiner downstream)
+                            post-combiner- (:post-combiner downstream)]
+                      ~@body))))))
+
+(defmacro deftransform
+  "Deftransform, assuming transforms should be appended to the end of the
+  transform."
+  [& args]
+  `(deftransform* 'append ~@args))
 
 ;; General transformations
 
@@ -388,6 +395,25 @@
    :post-reducer  identity
    :combiner      core/concat
    :post-combiner (partial core/into coll)})
+
+(deftransform post-combine
+  "Transforms the output of a fold by applying a function to it.
+
+  For instance, to find the square root of the mean of a sequence of numbers,
+  try
+
+    (->> (t/mean) (t/post-combine sqrt) (t/tesser nums))
+
+  For clarity in ->> composition, post-combine composes in the opposite
+  direction from map, filter, etc. It *prepends* a transform to the given fold
+  instead of *appending* one. This means post-combines take effect in the same
+  order you'd expect from ->> with normal function calls:
+
+    (->> (t/mean)                 (->> (mean nums)
+         (t/post-combine sqrt)         (sqrt)
+         (t/post-combine inc))         (inc))"
+  [f]
+  (deftransform* 'cons
 
 ;; Splitting folds
 
@@ -534,4 +560,7 @@
                     (+ sq sq2 (/ (* (- m2 m) (- m2 m) c c2) count))])))
    :post-combiner (fn vardiv [x] (double (/ (last x) (max 1 (dec (first x))))))})
 
-
+(defn standard-deviation
+  "Estimates the standard deviation of numeric inputs."
+  [fold]
+  (->> fol 
