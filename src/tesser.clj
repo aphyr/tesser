@@ -336,10 +336,16 @@
                       ~@body))))))
 
 (defmacro deftransform
-  "Deftransform, assuming transforms should be appended to the end of the
-  transform."
+  "Deftransform, assuming transforms should be appended to the end of the fold;
+  e.g. innermost."
   [& args]
-  `(deftransform* 'append ~@args))
+  `(deftransform* append ~@args))
+
+(defmacro defwraptransform
+  "Like deftransform, but prepends the given transform to the beginning of the
+  fold; e.g. outermost."
+  [& args]
+  `(deftransform* prepend ~@args))
 
 ;; General transformations
 
@@ -396,7 +402,7 @@
    :combiner      core/concat
    :post-combiner (partial core/into coll)})
 
-(deftransform post-combine
+(defwraptransform post-combine
   "Transforms the output of a fold by applying a function to it.
 
   For instance, to find the square root of the mean of a sequence of numbers,
@@ -413,7 +419,9 @@
          (t/post-combine sqrt)         (sqrt)
          (t/post-combine inc))         (inc))"
   [f]
-  (deftransform* 'cons
+  (assoc downstream :post-combiner
+         (fn post-combiner [x]
+           (f (post-combiner- x)))))
 
 ;; Splitting folds
 
@@ -562,5 +570,5 @@
 
 (defn standard-deviation
   "Estimates the standard deviation of numeric inputs."
-  [fold]
-  (->> fol 
+  []
+  (->> (variance) (post-combine sqrt)))

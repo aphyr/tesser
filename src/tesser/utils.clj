@@ -4,6 +4,14 @@
             [clojure.string :as str]
             [clojure.math.numeric-tower :refer :all]))
 
+(defn prepend
+  "Prepends a single value to the beginning of a sequence. O(1) for sequences
+  using cons, O(n) for vectors. Returns a singleton vector when coll is nil."
+  [coll element]
+  (cond (nil? coll)    [element]
+        (vector? coll) (vec (cons element coll))
+        true           (cons element coll)))
+
 (defn append
   "Appends a single value to the end of a sequence. O(1); uses conj for
   vectors, concat for other seqs."

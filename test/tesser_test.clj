@@ -108,6 +108,22 @@
                 (is (= (t/tesser chunks (t/into #{}))
                        (set (flatten1 chunks))))))
 
+(defspec post-combine-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/map inc)
+                            (t/map str)
+                            (t/into #{})
+                            (t/post-combine sort)
+                            (t/post-combine (partial map read-string))
+                            (t/tesser chunks))
+                       (->> (flatten1 chunks)
+                            (map inc)
+                            (map str)
+                            (into #{})
+                            sort
+                            (map read-string))))))
+
 ;; Splitting folds
 
 (defspec facet-spec
@@ -171,9 +187,9 @@
                 (=ish (t/tesser chunks (t/variance))
                       (variance (flatten1 chunks)))))
 
-(defspec standard-deviation-spec
-  test-count
-  (prop/for-all [chunks (gen/such-that (partial some not-empty)
-                                       (chunks gen/int))]
-                (=ish (t/tesser chunks (t/standard-deviation))
-                      (sqrt (variance (flatten1 chunks))))))
+;(defspec standard-deviation-spec
+;  test-count
+;  (prop/for-all [chunks (gen/such-that (partial some not-empty)
+;                                       (chunks gen/int))]
+;                (=ish (t/tesser chunks (t/standard-deviation))
+;                      (sqrt (variance (flatten1 chunks))))))
