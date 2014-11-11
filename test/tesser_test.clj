@@ -187,9 +187,9 @@
                 (=ish (t/tesser chunks (t/variance))
                       (variance (flatten1 chunks)))))
 
-;(defspec standard-deviation-spec
-;  test-count
-;  (prop/for-all [chunks (gen/such-that (partial some not-empty)
-;                                       (chunks gen/int))]
-;                (=ish (t/tesser chunks (t/standard-deviation))
-;                      (sqrt (variance (flatten1 chunks))))))
+(defspec standard-deviation-spec
+  test-count
+  (prop/for-all [chunks (gen/such-that (partial some not-empty)
+                                       (chunks gen/int))]
+                (=ish (t/tesser chunks (t/standard-deviation))
+                      (sqrt (variance (flatten1 chunks))))))

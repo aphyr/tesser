@@ -570,5 +570,6 @@
 
 (defn standard-deviation
   "Estimates the standard deviation of numeric inputs."
-  []
-  (->> (variance) (post-combine sqrt)))
+  [& [downstream]]
+  (->> downstream (variance) (post-combine sqrt)))
+
