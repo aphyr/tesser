@@ -609,16 +609,19 @@
                     (when (pos? c) ; Return nil if no inputs
                       (double (/ sq (max 1 (dec c))))))})
 
+(defn fuse-matrix
+  "Given:
 
-(defn covariance-matrix
-  "Given a map of key names to functions that extract values for those keys
-  from an input, computes the covariance for each of the n^2 key pairs,
-  returning a map of name pairs to the their covariance. For example:
+  1. A function like `covariance` that takes two functions of an input and
+     yields a fold, and
 
-  (t/covariance-matrix {:name-length #(.length (:name %))
-                        :age         :age
-                        :num-cats    (comp count :cats)})"
-  [keymap & [downstream]]
+  2. A map of key names to functions that extract values for
+     those keys from an input,
+
+  pairwise-matrix computes that fold over each *pair* of keys, returning a map
+  of name pairs to the result of that pairwise fold over the inputs. You can
+  think of this like an N^2 version of `fuse`."
+  [fold keymap & [downstream]]
   (->> downstream
        ; For this transform, map inputs to a temporary map of keys->values;
        ; we'll be doing O(keys) lookups on each key, so having a flat map cuts
@@ -634,9 +637,19 @@
        (fuse (->> (combo/combinations (core/keys keymap) 2)
                   ; Turn pairs into [pair, covariance-fold]
                   (core/map (fn [[k1 k2]]
-                              [[k1 k2] (covariance #(get % k1) #(get % k2))]))
-                  ; And fuse those together
+                              [[k1 k2] (fold #(get % k1) #(get % k2))]))
                   (core/into {})))
 
        ; And return both halves of the resulting triangular matrix
        (post-combine complete-triangular-matrix)))
+
+(defn covariance-matrix
+  "Given a map of key names to functions that extract values for those keys
+  from an input, computes the covariance for each of the n^2 key pairs,
+  returning a map of name pairs to the their covariance. For example:
+
+  (t/covariance-matrix {:name-length #(.length (:name %))
+                        :age         :age
+                        :num-cats    (comp count :cats)})"
+  [keymap & downstream]
+  (apply fuse-matrix covariance keymap downstream))
