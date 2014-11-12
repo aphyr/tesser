@@ -9,8 +9,7 @@
             [tesser.utils :refer :all]
             [tesser :as t]))
 
-(def test-count
-    1e3)
+(def test-count 1e2)
 
 (deftest map-sum-test
   (is (= (->> (t/map inc)
@@ -246,9 +245,9 @@
         (try
           (/ (reduce + (map * mxs mys))
              (sqrt (* (reduce + (map * mxs mxs))
-                      (reduce + (map * mys mys))))))
+                      (reduce + (map * mys mys)))))
           (catch ArithmeticException e
-            nil)))))
+            nil))))))
 
 (defspec correlation-spec
   test-count
@@ -256,3 +255,21 @@
                 (is (= (->> (t/correlation :x :y)
                             (t/tesser chunks))
                        (correlation :x :y (flatten1 chunks))))))
+
+(defspec correlation-matrix-spec
+  test-count
+  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y :z]) gen/int))]
+                (let [inputs (flatten1 chunks)]
+                  (is (= (->> (t/correlation-matrix {"x" :x "y" :y "z" :z})
+                              (t/tesser chunks))
+                         ; NOTE: depends on math.combinatorics order; fragile
+                         ; but easy to fix.
+                         (let [xy (correlation :x :y inputs)
+                               xz (correlation :x :z inputs)
+                               yz (correlation :y :z inputs)]
+                           {["x" "y"] xy
+                            ["x" "z"] xz
+                            ["y" "x"] xy
+                            ["y" "z"] yz
+                            ["z" "x"] xz
+                            ["z" "y"] yz}))))))

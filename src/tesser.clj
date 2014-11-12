@@ -651,8 +651,8 @@
   (t/covariance-matrix {:name-length #(.length (:name %))
                         :age         :age
                         :num-cats    (comp count :cats)})"
-  [keymap & downstream]
-  (apply fuse-matrix covariance keymap downstream))
+  [& args]
+  (apply fuse-matrix covariance args))
 
 (deftransform correlation+count
   "Given two functions: (fx input) and (fy input), each of which returns a
@@ -700,9 +700,33 @@
                         {:count c
                          :correlation (/ ssxy div)})))})
 
+(defn correlation+count-matrix
+  "Given a map of key names to functions that extract values for those keys
+  from an input, computes the correlations for each of the n^2 key
+  pairs, returning a map of name pairs to the their correlations and counts.
+  See correlation+count. For example:
+
+  (t/correlation-matrix {:name-length #(.length (:name %))
+                        :age         :age
+                        :num-cats    (comp count :cats)})
+
+  will, when executed, returns a map like
+
+  {[:name-length :age]      {:count 150 :correlation 0.56}
+   [:name-length :num-cats] {:count 150 :correlation 0.95}
+   ...}"
+  [& args]
+  (apply fuse-matrix correlation+count args))
+
 (defn correlation
   "Like correlation+count, but only returns the correlation."
   [& args]
   (->> args
        (apply correlation+count)
        (post-combine :correlation)))
+
+(defn correlation-matrix
+  "Like correlation+count-matrix, but returns just correlations coefficients
+  instead of maps of :correlation and :count."
+  [& args]
+  (apply fuse-matrix correlation args))
