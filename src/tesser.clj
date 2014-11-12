@@ -608,3 +608,35 @@
    :post-combiner (fn vardiv [[c _ _ sq]]
                     (when (pos? c) ; Return nil if no inputs
                       (double (/ sq (max 1 (dec c))))))})
+
+
+(defn covariance-matrix
+  "Given a map of key names to functions that extract values for those keys
+  from an input, computes the covariance for each of the n^2 key pairs,
+  returning a map of name pairs to the their covariance. For example:
+
+  (t/covariance-matrix {:name-length #(.length (:name %))
+                        :age         :age
+                        :num-cats    (comp count :cats)})"
+  [keymap & [downstream]]
+  (->> downstream
+       ; For this transform, map inputs to a temporary map of keys->values;
+       ; we'll be doing O(keys) lookups on each key, so having a flat map cuts
+       ; down on having to re-run expensive extractor functions.
+       (map (fn project [input]
+              (->> keymap
+                   (core/reduce-kv (fn extract [m k extractor]
+                                     (assoc! m k (extractor input)))
+                                   (transient {}))
+                   persistent!)))
+
+       ; And pass those maps into a fused covariance transform
+       (fuse (->> (combo/combinations (core/keys keymap) 2)
+                  ; Turn pairs into [pair, covariance-fold]
+                  (core/map (fn [[k1 k2]]
+                              [[k1 k2] (covariance #(get % k1) #(get % k2))]))
+                  ; And fuse those together
+                  (core/into {})))
+
+       ; And return both halves of the resulting triangular matrix
+       (post-combine complete-triangular-matrix)))

@@ -149,3 +149,10 @@
 
      true
      (->> x class-sym (conj parent-path) (conj key-path-set)))))
+
+(defn complete-triangular-matrix
+  "Given a map of [x y] keys to values, returns a map where *both* [x y] and [y
+  x] point to identical values. Useful for pairwise comparisons which compute
+  triangular matrices but want to return a full matrix."
+  [m]
+  (->> m (map (fn [[[x y] value]] [[y x] value])) (into m)))

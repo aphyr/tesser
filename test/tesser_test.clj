@@ -209,8 +209,25 @@
 (defspec covariance-spec
   test-count
   ; Take maps like {}, {:x 1}, {:x 2 :y 3} and compute covariance
-  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y])
-                                         gen/int))]
+  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y]) gen/int))]
                 (is (= (->> (t/covariance :x :y)
                             (t/tesser chunks))
                        (covariance :x :y (flatten1 chunks))))))
+
+(defspec covariance-matrix-spec
+  test-count
+  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y :z]) gen/int))]
+                (let [inputs (flatten1 chunks)]
+                  (is (= (->> (t/covariance-matrix {"x" :x "y" :y "z" :z})
+                              (t/tesser chunks))
+                         ; NOTE: depends on math.combinatorics order; fragile
+                         ; but easy to fix.
+                         (let [xy (covariance :x :y inputs)
+                               xz (covariance :x :z inputs)
+                               yz (covariance :y :z inputs)]
+                           {["x" "y"] xy
+                            ["x" "z"] xz
+                            ["y" "x"] xy
+                            ["y" "z"] yz
+                            ["z" "x"] xz
+                            ["z" "y"] yz}))))))
