@@ -10,7 +10,7 @@
             [tesser :as t]))
 
 (def test-count
-    1e2)
+    1e3)
 
 (deftest map-sum-test
   (is (= (->> (t/map inc)
@@ -204,7 +204,7 @@
         (double (/ (reduce + (map #(* (- (fx %) mean-x)
                                       (- (fy %) mean-y))
                                   coll))
-                   (max (dec (count coll)) 1)))))))
+                   (count coll)))))))
 
 (defspec covariance-spec
   test-count
@@ -231,3 +231,28 @@
                             ["y" "z"] yz
                             ["z" "x"] xz
                             ["z" "y"] yz}))))))
+
+(defn correlation
+  [fx fy coll]
+  "http://mathworld.wolfram.com/CorrelationCoefficient.html"
+  (let [coll (filter fx (filter fy coll))]
+    (when-not (empty? coll)
+      (let [xs (map fx coll)
+            ys (map fy coll)
+            mx (mean (map fx coll))
+            my (mean (map fy coll))
+            mxs (map #(- % mx) xs)
+            mys (map #(- % my) ys)]
+        (try
+          (/ (reduce + (map * mxs mys))
+             (sqrt (* (reduce + (map * mxs mxs))
+                      (reduce + (map * mys mys))))))
+          (catch ArithmeticException e
+            nil)))))
+
+(defspec correlation-spec
+  test-count
+  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y]) gen/int))]
+                (is (= (->> (t/correlation :x :y)
+                            (t/tesser chunks))
+                       (correlation :x :y (flatten1 chunks))))))

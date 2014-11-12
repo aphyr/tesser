@@ -607,7 +607,7 @@
                     (+ sq sq2 (/ (* (- mx2 mx) (- my2 my) c c2) count))])))
    :post-combiner (fn vardiv [[c _ _ sq]]
                     (when (pos? c) ; Return nil if no inputs
-                      (double (/ sq (max 1 (dec c))))))})
+                      (double (/ sq c))))})
 
 (defn fuse-matrix
   "Given:
@@ -653,3 +653,56 @@
                         :num-cats    (comp count :cats)})"
   [keymap & downstream]
   (apply fuse-matrix covariance keymap downstream))
+
+(deftransform correlation+count
+  "Given two functions: (fx input) and (fy input), each of which returns a
+  number, estimates the unbiased linear correlation coefficient between fx and
+  fy over inputs. Ignores any records where fx or fy are nil. If there are no
+  records with values for fx and fy, the correlation is nil. See
+  http://mathworld.wolfram.com/CorrelationCoefficient.html.
+
+  This function returns a map of correlation and count, like
+
+  {:correlation 0.34 :count 142}
+
+  which is useful for significance testing."
+  [fx fy]
+  {:identity (constantly [0 0 0 0 0 0])
+   :reducer (->> (fn count-m2-sq3 [[count meanx meany ssx ssy ssxy :as acc] elt]
+                   (let [x (fx elt)
+                         y (fy elt)]
+                     (if-not (and x y)
+                       acc
+                       (let [count' (inc count)
+                             meanx'  (+ meanx (/ (- x meanx) count'))
+                             meany'  (+ meany (/ (- y meany) count'))]
+                         [count'
+                          meanx'
+                          meany'
+                          (+ ssx (* (- x meanx') (- x meanx)))
+                          (+ ssy (* (- y meany') (- y meany)))
+                          (+ ssxy (* (- x meanx') (- y meany)))])))))
+   :post-reducer identity
+   :combiner (fn partcm2sq3 [[c  mx  my  ssx  ssy ssxy]
+                             [c2 mx2 my2 ssx2 ssy2 ssxy2]]
+               (let [count (+ c c2)]
+                 (if (zero? count)
+                   [c mx my ssx ssy ssxy]
+                   [count
+                    (/ (+ (* c mx) (* c2 mx2)) count)
+                    (/ (+ (* c my) (* c2 my2)) count)
+                    (+ ssx ssx2 (/ (* (- mx2 mx) (- mx2 mx) c c2) count))
+                    (+ ssy ssy2 (/ (* (- my2 my) (- my2 my) c c2) count))
+                    (+ ssxy ssxy2 (/ (* (- mx2 mx) (- my2 my) c c2) count))])))
+   :post-combiner (fn corrdiv [[c mx my ssx ssy ssxy]]
+                    (let [div (sqrt (* ssx ssy))]
+                      (when-not (zero? div)
+                        {:count c
+                         :correlation (/ ssxy div)})))})
+
+(defn correlation
+  "Like correlation+count, but only returns the correlation."
+  [& args]
+  (->> args
+       (apply correlation+count)
+       (post-combine :correlation)))
