@@ -151,6 +151,14 @@
                           :set      (set inputs)
                           :multiset (into (multiset) inputs)})))))
 
+;; Basic reductions
+
+(defspec count-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (t/tesser chunks (t/count))
+                       (count (flatten1 chunks))))))
+
 ;; Numeric folds
 
 (defspec sum-spec

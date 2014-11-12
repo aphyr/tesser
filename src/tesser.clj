@@ -523,6 +523,17 @@
                                                             folds)
                                                   xs)))}))
 
+;; Basic reductions
+
+(deftransform count
+  "How many inputs are there?"
+  []
+  {:identity (constantly 0)
+   :reducer  (fn reducer [c _] (inc c))
+   :post-reducer identity
+   :combiner +
+   :post-combiner identity})
+
 ;; Numeric folds
 
 (deftransform sum
