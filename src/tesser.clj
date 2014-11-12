@@ -534,6 +534,15 @@
    :combiner +
    :post-combiner identity})
 
+(deftransform set
+  "A hash-set of distinct inputs."
+  []
+  {:identity      (constantly #{})
+   :reducer       conj
+   :post-reducer  identity
+   :combiner      set/union
+   :post-combiner identity})
+
 ;; Numeric folds
 
 (deftransform sum

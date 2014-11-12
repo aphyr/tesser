@@ -155,9 +155,15 @@
 
 (defspec count-spec
   test-count
-  (prop/for-all [chunks (chunks gen/int)]
+  (prop/for-all [chunks (chunks gen/simple-type)]
                 (is (= (t/tesser chunks (t/count))
                        (count (flatten1 chunks))))))
+
+(defspec set-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/simple-type)]
+                (is (= (t/tesser chunks (t/set))
+                       (set (flatten1 chunks))))))
 
 ;; Numeric folds
 
