@@ -28,7 +28,7 @@
        (t/reduce +)
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
-  (:refer-clojure :exclude [map keep filter remove count range frequencies into])
+  (:refer-clojure :exclude [map keep filter remove count range frequencies into set])
   (:import (com.clearspring.analytics.stream.quantile QDigest)
            (java.lang.Math))
   (:require [tesser.utils :refer :all]
@@ -541,6 +541,17 @@
    :reducer       conj
    :post-reducer  identity
    :combiner      set/union
+   :post-combiner identity})
+
+(deftransform frequencies
+  "Like clojure.core/frequencies, returns a map of inputs to the number of
+  times those inputs appeared in the collection."
+  []
+  {:identity hash-map
+   :reducer  (fn add [freqs x]
+               (assoc freqs x (inc (get freqs x 0))))
+   :post-reducer identity
+   :combiner (partial merge-with +)
    :post-combiner identity})
 
 ;; Numeric folds

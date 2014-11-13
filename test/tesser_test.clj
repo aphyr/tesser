@@ -165,6 +165,12 @@
                 (is (= (t/tesser chunks (t/set))
                        (set (flatten1 chunks))))))
 
+(defspec frequencies-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (t/tesser chunks (t/frequencies))
+                       (frequencies (flatten1 chunks))))))
+
 ;; Numeric folds
 
 (defspec sum-spec
