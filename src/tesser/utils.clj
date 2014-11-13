@@ -156,3 +156,9 @@
   triangular matrices but want to return a full matrix."
   [m]
   (->> m (map (fn [[[x y] value]] [[y x] value])) (into m)))
+
+(defn first-non-nil-reducer
+  "A reducing function that simply returns the first non-nil element in the
+  collection."
+  [_ x]
+  (when-not (nil? x) (reduced x)))

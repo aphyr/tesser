@@ -28,7 +28,7 @@
        (t/reduce +)
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
-  (:refer-clojure :exclude [map keep filter remove count range frequencies into set])
+  (:refer-clojure :exclude [map keep filter remove count range frequencies into set some])
   (:import (com.clearspring.analytics.stream.quantile QDigest)
            (java.lang.Math))
   (:require [tesser.utils :refer :all]
@@ -528,6 +528,7 @@
 (deftransform count
   "How many inputs are there?"
   []
+  (assert (nil? downstream))
   {:identity (constantly 0)
    :reducer  (fn reducer [c _] (inc c))
    :post-reducer identity
@@ -537,6 +538,7 @@
 (deftransform set
   "A hash-set of distinct inputs."
   []
+  (assert (nil? downstream))
   {:identity      (constantly #{})
    :reducer       conj
    :post-reducer  identity
@@ -547,11 +549,39 @@
   "Like clojure.core/frequencies, returns a map of inputs to the number of
   times those inputs appeared in the collection."
   []
+  (assert (nil? downstream))
   {:identity hash-map
    :reducer  (fn add [freqs x]
                (assoc freqs x (inc (get freqs x 0))))
    :post-reducer identity
    :combiner (partial merge-with +)
+   :post-combiner identity})
+
+(deftransform some
+  "Returns any input from the collection that satisfies the given predicate;
+  e.g. (pred input) is truthy. If no such input exists, returns nil.
+
+  This is potentially *less* efficient than clojure.core/some because each
+  reducer has to find a matching element independently, and they have no way to
+  communicate when one has found an element. In the worst-case scenario,
+  requires N calls to `pred`. However, unlike clojure.core/some, this version
+  is parallelizable--which can make it more efficient."
+  [pred]
+  (assert (nil? downstream))
+  {:identity      (constantly nil)
+   :reducer       (fn reducer [_ x] (when (pred x) (reduced x)))
+   :post-reducer  identity
+   :combiner      first-non-nil-reducer
+   :post-combiner identity})
+
+(deftransform any
+  "Returns any single input from the collection. O(chunks)."
+  []
+  (assert (nil? downstream))
+  {:identity      (constantly nil)
+   :reducer       first-non-nil-reducer
+   :post-reducer  identity
+   :combiner      first-non-nil-reducer
    :post-combiner identity})
 
 ;; Numeric folds
@@ -562,9 +592,9 @@
   (assert (nil? downstream))
   {:identity      (constantly 0)
    :reducer       +
-   :post-reducer  core/identity
+   :post-reducer  identity
    :combiner      +
-   :post-combiner core/identity})
+   :post-combiner identity})
 
 (deftransform mean
   "Finds the arithmetic mean of numeric inputs."

@@ -171,6 +171,22 @@
                 (is (= (t/tesser chunks (t/frequencies))
                        (frequencies (flatten1 chunks))))))
 
+(defspec some-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [e          (t/tesser chunks (t/some even?))
+                      candidates (set (filter even? (flatten1 chunks)))]
+                  (is (or (contains? candidates e)
+                          (and (empty? candidates) (nil? e)))))))
+
+(defspec any-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/simple-type)]
+                (let [e           (t/tesser chunks (t/any))
+                      candidates  (set (flatten1 chunks))]
+                  (is (or (contains? candidates e)
+                          (and (empty? candidates) (nil? e)))))))
+
 ;; Numeric folds
 
 (defspec sum-spec
