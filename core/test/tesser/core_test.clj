@@ -1,6 +1,5 @@
 (ns tesser.core-test
   (:require [clojure.test :refer :all]
-            [clojure.math.numeric-tower :refer :all]
             [clojure.test.check :as tc]
             [clojure.test.check [clojure-test :refer :all]
                                 [generators :as gen]
@@ -9,32 +8,7 @@
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
-(def test-count 1e2)
-
-(deftest map-sum-test
-  (is (= (->> (t/map inc)
-              (t/sum)
-              (t/tesser [[1 2 3] [4 5 6] []]))
-         27)))
-
-;(deftest facet-mean-test
-;  (is (= (->> (t/facet)
-;              (t/mean)
-;              (t/tesser [[{:x 1, :y 2} {}]
-;                        [{:y 3, :z 4}]]))
-;         {:x 1, :y 2, :z 4})))
-
-;; Utility functions
-(defn approx=
-  "Equal to within err fraction, or if one is zero, to within err absolute."
-  [err x y]
-  (if (or (zero? x) (zero? y))
-    (< (- err) (- x y) err)
-    (< (- 1 err) (/ x y) (+ 1 err))))
-
-(def =ish
-  "Almost equal"
-  (partial approx= 1/1000))
+(def test-count 1e3)
 
 (defn chunks
   "Given a generator for inputs, returns a generator that builds
@@ -205,22 +179,23 @@
                           (gen/resize 4 (gen/map (gen/elements [:a :b :c :d :e])
                                                  gen/int)))]
                 (is (= (->> (t/facet)
-                            (t/sum)
+                            (t/min)
                             (t/tesser chunks))
                        (->> chunks
                             flatten1
-                            (apply merge-with + {}))))))
+                            (apply merge-with min {}))))))
 
 (defspec fuse-spec
   test-count
   ; sum, set, and multiset over ints
   (prop/for-all [chunks (chunks gen/int)]
                 (let [inputs (flatten1 chunks)]
-                  (is (= (->> (t/fuse {:sum      (t/sum)
+                  (is (= (->> (t/fuse {:max      (t/max)
                                        :set      (t/into #{})
                                        :multiset (t/into (multiset))})
                               (t/tesser chunks))
-                         {:sum      (reduce + inputs)
+                         {:max      (when-not (empty? inputs)
+                                      (reduce max inputs))
                           :set      (set inputs)
                           :multiset (into (multiset) inputs)})))))
 
@@ -286,127 +261,3 @@
                      (if (every? empty? chunks)
                        [nil nil]
                        [(reduce min inputs) (reduce max inputs)])))))
-
-
-;; Numeric folds
-
-(defspec sum-spec
-  test-count
-  (prop/for-all [chunks (chunks gen/int)]
-                (is (= (t/tesser chunks (t/sum))
-                        (reduce + 0 (flatten1 chunks))))))
-
-(defn mean
-  [coll]
-  (assert (not (empty? coll)))
-  (/ (reduce + coll) (count coll)))
-
-(defspec mean-spec
-  test-count
-  (prop/for-all [chunks (gen/such-that (partial some not-empty)
-                                       (chunks gen/int))]
-                (is (== (t/tesser chunks (t/mean))
-                        (mean (flatten1 chunks))))))
-
-
-(defn variance
-  [coll]
-  (/ (->> coll
-          (map #(expt (- % (mean coll)) 2))
-          (reduce +))
-     (max (dec (count coll)) 1)))
-
-(defspec variance-spec
-  test-count
-  (prop/for-all [chunks (gen/such-that (partial some not-empty)
-                                       (chunks gen/int))]
-                (=ish (t/tesser chunks (t/variance))
-                      (variance (flatten1 chunks)))))
-
-(defspec standard-deviation-spec
-  test-count
-  (prop/for-all [chunks (gen/such-that (partial some not-empty)
-                                       (chunks gen/int))]
-                (=ish (t/tesser chunks (t/standard-deviation))
-                      (sqrt (variance (flatten1 chunks))))))
-
-(defn covariance
-  [fx fy coll]
-  (let [coll (filter fx (filter fy coll))]
-    (if (empty? coll)
-      nil
-      (let [mean-x (mean (map fx coll))
-            mean-y (mean (map fy coll))]
-        (double (/ (reduce + (map #(* (- (fx %) mean-x)
-                                      (- (fy %) mean-y))
-                                  coll))
-                   (count coll)))))))
-
-(defspec covariance-spec
-  test-count
-  ; Take maps like {}, {:x 1}, {:x 2 :y 3} and compute covariance
-  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y]) gen/int))]
-                (is (= (->> (t/covariance :x :y)
-                            (t/tesser chunks))
-                       (covariance :x :y (flatten1 chunks))))))
-
-(defspec covariance-matrix-spec
-  test-count
-  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y :z]) gen/int))]
-                (let [inputs (flatten1 chunks)]
-                  (is (= (->> (t/covariance-matrix {"x" :x "y" :y "z" :z})
-                              (t/tesser chunks))
-                         ; NOTE: depends on math.combinatorics order; fragile
-                         ; but easy to fix.
-                         (let [xy (covariance :x :y inputs)
-                               xz (covariance :x :z inputs)
-                               yz (covariance :y :z inputs)]
-                           {["x" "y"] xy
-                            ["x" "z"] xz
-                            ["y" "x"] xy
-                            ["y" "z"] yz
-                            ["z" "x"] xz
-                            ["z" "y"] yz}))))))
-
-(defn correlation
-  [fx fy coll]
-  "http://mathworld.wolfram.com/CorrelationCoefficient.html"
-  (let [coll (filter fx (filter fy coll))]
-    (when-not (empty? coll)
-      (let [xs (map fx coll)
-            ys (map fy coll)
-            mx (mean (map fx coll))
-            my (mean (map fy coll))
-            mxs (map #(- % mx) xs)
-            mys (map #(- % my) ys)]
-        (try
-          (/ (reduce + (map * mxs mys))
-             (sqrt (* (reduce + (map * mxs mxs))
-                      (reduce + (map * mys mys)))))
-          (catch ArithmeticException e
-            nil))))))
-
-(defspec correlation-spec
-  test-count
-  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y]) gen/int))]
-                (is (= (->> (t/correlation :x :y)
-                            (t/tesser chunks))
-                       (correlation :x :y (flatten1 chunks))))))
-
-(defspec correlation-matrix-spec
-  test-count
-  (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y :z]) gen/int))]
-                (let [inputs (flatten1 chunks)]
-                  (is (= (->> (t/correlation-matrix {"x" :x "y" :y "z" :z})
-                              (t/tesser chunks))
-                         ; NOTE: depends on math.combinatorics order; fragile
-                         ; but easy to fix.
-                         (let [xy (correlation :x :y inputs)
-                               xz (correlation :x :z inputs)
-                               yz (correlation :y :z inputs)]
-                           {["x" "y"] xy
-                            ["x" "z"] xz
-                            ["y" "x"] xy
-                            ["y" "z"] yz
-                            ["z" "x"] xz
-                            ["z" "y"] yz}))))))
