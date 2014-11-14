@@ -62,6 +62,19 @@
                             (map (partial * 2))
                             (into (multiset)))))))
 
+(defspec mapcat-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/mapcat range)
+                            (t/filter even?)
+                            (t/into (multiset))
+                            (t/tesser chunks))
+                       (->> chunks
+                            flatten1
+                            (mapcat range)
+                            (filter even?)
+                            (into (multiset)))))))
+
 (defspec keep-spec
   test-count
   (prop/for-all [chunks (chunks gen/int)]

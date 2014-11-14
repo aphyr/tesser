@@ -28,8 +28,8 @@
        (t/reduce +)
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
-  (:refer-clojure :exclude [map keep filter remove count range frequencies into
-                            set some take])
+  (:refer-clojure :exclude [map mapcat keep filter remove count range
+                            frequencies into set some take])
   (:import (com.clearspring.analytics.stream.quantile QDigest)
            (java.lang.Math))
   (:require [tesser.utils :refer :all]
@@ -357,6 +357,15 @@
   (assoc downstream :reducer (fn reducer [acc x]
                                (reducer- acc (f x)))))
 
+(deftransform mapcat
+  "Takes a function `f` and an optional fold. Returns a version of the fold
+  which finally calls (f input) to transform each element. (f input) should
+  return a *sequence* of inputs which will be fed to the downstream transform
+  independently."
+  [f]
+  (assoc downstream :reducer (fn reducer [acc input]
+                               (reduce reducer- acc (f input)))))
+
 (deftransform keep
   "Takes a function `f` and an optional fold. Returns a version of the fold
   which finally calls (f input) to transform each element, and passes it on to
@@ -493,7 +502,8 @@
    :post-reducer (fn post-reducer [reductions]
                    (->> reductions
                         (partition 2)
-                        (mapcat (fn [[n acc]] (list n (post-reducer- acc))))))
+                        (core/mapcat (fn [[n acc]] (list n (post-reducer-
+                                                             acc))))))
 
    :combiner     (fn combiner [outer-acc reductions]
                    (let [acc' (reduce (fn merger [acc [c2 x2]]
