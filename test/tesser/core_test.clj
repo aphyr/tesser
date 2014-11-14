@@ -1,4 +1,4 @@
-(ns tesser-test
+(ns tesser.core-test
   (:require [clojure.test :refer :all]
             [clojure.math.numeric-tower :refer :all]
             [clojure.test.check :as tc]
@@ -7,7 +7,7 @@
                                 [properties :as prop]]
             [multiset.core :refer [multiset]]
             [tesser.utils :refer :all]
-            [tesser :as t]))
+            [tesser.core :as t]))
 
 (def test-count 1e2)
 
