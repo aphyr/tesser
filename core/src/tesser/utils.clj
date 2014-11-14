@@ -2,8 +2,7 @@
   "Toolbox."
   (:require [clojure [set :as set]
                      [string :as str]
-                     [walk :as walk]]
-            [clojure.math.numeric-tower :refer :all]))
+                     [walk :as walk]]))
 
 (defn prepend
   "Prepends a single value to the beginning of a sequence. O(1) for sequences
@@ -58,31 +57,6 @@
     (reduce (fn [m x] (assoc! m (f x) x))
             (transient {})
             xs)))
-
-(defn atanh
-  "Express inverse hyperbolic tangent in terms of logarithms."
-  [r]
-  (/ (java.lang.Math/log (/ (+ 1 r)
-                            (- 1 r)))
-     2))
-
-(defn sigma-Z
-  "Compute standard error for Fisher-Z transformation."
-  [n]
-  (/ 1 (sqrt (- n 3))))
-
-(defn power-r
-  "Given linear corr coeff, r, and sample size n use the Fisher-Z transformation
-  and its standard error to determine whether the correlation is statistically
-  significant at the 5% level. If it is, return 1. Otherwise, return 0." 
-  [r,n,nsd]
-  (if (< n 5)
-    0
-    (if (#{-1,1} r)
-      1
-      (if (< 0 (- (abs (atanh r)) (* nsd (sigma-Z n))))
-        1
-        0))))
 
 (defn path-fn
   "Takes a path for get-in and converts it to a function that operates on

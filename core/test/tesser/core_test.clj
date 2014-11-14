@@ -203,13 +203,13 @@
 
 (defspec count-spec
   test-count
-  (prop/for-all [chunks (chunks gen/simple-type)]
+  (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/count))
                        (count (flatten1 chunks))))))
 
 (defspec set-spec
   test-count
-  (prop/for-all [chunks (chunks gen/simple-type)]
+  (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/set))
                        (set (flatten1 chunks))))))
 
@@ -229,7 +229,7 @@
 
 (defspec any-spec
   test-count
-  (prop/for-all [chunks (chunks gen/simple-type)]
+  (prop/for-all [chunks (chunks gen/int)]
                 (let [e           (t/tesser chunks (t/any))
                       candidates  (set (flatten1 chunks))]
                   (is (or (contains? candidates e)
