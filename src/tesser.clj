@@ -28,7 +28,8 @@
        (t/reduce +)
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
-  (:refer-clojure :exclude [map keep filter remove count range frequencies into set some])
+  (:refer-clojure :exclude [map keep filter remove count range frequencies into
+                            set some take])
   (:import (com.clearspring.analytics.stream.quantile QDigest)
            (java.lang.Math))
   (:require [tesser.utils :refer :all]
@@ -385,6 +386,140 @@
                                (if (pred x)
                                  acc
                                  (reducer- acc x)))))
+
+(deftransform take
+  "Like clojure.core/take, limits the number of inputs passed to the downstream
+  transformer to exactly n, or if fewer than n inputs exist in total, all
+  inputs.
+
+  Space complexity note: take's reducers produce log2(chunk-size) reduced
+  values per chunk, ranging from 1 to chunk-size/2 inputs, rather than a single
+  reduced value for each chunk. See the source for *why* this is the case."
+  [n]
+  ; This is a little complicated.
+  ;
+  ; If a chunk has n more more inputs, our job is simple: simply stop
+  ; reduction after that many inputs have accrued, and return the reduced
+  ; result. Any one of these reduced values will suffice for the final value.
+  ;
+  ; |------|
+  ; [x x x x .] [. . . .] [. . .]
+  ;
+  ; If a chunk has fewer than n inputs, we may need to combine reduced values
+  ; from more than one collection. In the limiting case, all chunks together
+  ; have fewer than n inputs, and we simply combine the final reductions from
+  ; each chunk.
+  ;
+  ; |---------------------------------|
+  ; [x x x] [x x x x] [x x]
+  ;
+  ; What if there are enough inputs altogether to reach n, but no single chunk
+  ; has enough?
+  ;
+  ; |---------------------------------|
+  ; [x . . . . . .] [x . . . . . . . . . .]
+  ; [. x x . . . .] [. x x . . . . . . . .]
+  ; [. . . x x x x] [. . . x x x x . . . .]
+  ;                 [. . . . . . . x x x x]
+  ;
+  ; For each chunk we've computed a sequence of intermediate reductions over
+  ; disjoint powers-of-two inputs, capped to the size of the chunk. Because the
+  ; set of inputs to any pair of chunks are disjoint, any combination of these
+  ; reductions is valid.
+  ;
+  ; Now the question is, can we find a combination which covers n inputs? Or,
+  ; equivalently, can we express any number up to the total number of inputs as
+  ; the sum of some subset of a set of integers like:
+  ;
+  ; [1 2 4 8 (1 <= x1 <= 16)] [1 2 4 8 16 (1 <= x2 <= 32)] ...
+  ;
+  ; where x1, x2, ... are the remainder reductions from the end of each chunk.
+  ;
+  ; It is sufficient to show that we can reduce any individual chunk to an
+  ; arbitrary number of inputs.
+  ;
+  ; [1 2 4 8 ... b (0 < x < b)]
+  ;
+  ; Every number from 0 to 2b - 1 is expressible as a sum of the powers of
+  ; two--all numbers excluding x. This is a straightforward binary
+  ; representation.
+  ;
+  ; 0      []
+  ; 1      [1]
+  ; 2      [2]
+  ; 3      [1 2]
+  ; ...
+  ; 2b - 1 [1 2 4 8 ... b]
+  ;
+  ; What about the numbers from 2b to 2b - 1 + x? Well every one of *those*
+  ; numbers is of the form y + x, where y <= 2b - 1. We have x, and we also
+  ; know from the preceding binary argument that we can express every number
+  ; from 0 to 2b-1 as a combination of the remaining elements.
+  ;
+  ; Therefore we can express a reduction over any number of inputs up to the
+  ; size of the chunk using only that chunk. By extension, we can express a
+  ; reduction over any number of inputs up to n.
+  ;
+  ; Because we know each chunk's reductions can independently express any
+  ; number of inputs up to the chunk size, we can process each chunk's
+  ; reductions in the combiner independently, instead of retaining extra state
+  ; from chunk to chunk. We simply fold in the largest reduction possible
+  ; without blowing past n, and when a chunk is exhausted, move to the next.
+  ;
+  ; As our intermediate data structure for reduce, we'll take a list of
+  ; (input-count, reduced-state, input-count-2, reduced-state-2, ...)
+  ; largest-to-smallest order.
+  [n]
+  (assert (not (neg? n)))
+  {:identity      (fn identity [] (list 0 (identity-)))
+
+   :reducer       (fn reducer [[c acc & finished :as reductions] input]
+                    ; TODO: limit to n
+                    (if (zero? c)
+                      ; Overwrite the 0 pair
+                      (scred reducer-
+                             (list 1 (reducer- acc input)))
+                      (let [limit (expt 2 (dec (/ (core/count reductions) 2)))]
+                        (if (<= limit c)
+                          ; We've filled this chunk; proceed to the next.
+                          (scred reducer-
+                                 (cons 1 (cons (reducer- (identity-) input)
+                                               reductions)))
+                          ; Chunk ain't full yet; keep going.
+                          (scred reducer-
+                                 (cons (inc c) (cons (reducer- acc input)
+                                                     finished)))))))
+
+   :post-reducer (fn post-reducer [reductions]
+                   (->> reductions
+                        (partition 2)
+                        (mapcat (fn [[n acc]] (list n (post-reducer- acc))))))
+
+   :combiner     (fn combiner [outer-acc reductions]
+                   (let [acc' (reduce (fn merger [acc [c2 x2]]
+                                        (let [[c1 x1] acc]
+                                          (if (= n c1)
+                                            ; Done
+                                            (reduced acc)
+                                            ; OK, how big would we get if we
+                                            ; merged x2?
+                                            (let [c' (+ c1 c2)]
+                                              (if (< n c')
+                                                ; Too big; pass
+                                                acc
+                                                ; Within bounds; take it!
+                                                (scred combiner-
+                                                       (list c' (combiner-
+                                                                  x1 x2))))))))
+                                      outer-acc
+                                      (partition 2 reductions))]
+
+                     ; Break off as soon as we have n elements
+                     (if (= n (first acc'))
+                       (reduced acc')
+                       acc')))
+
+   :post-combiner (comp post-combiner- second)})
 
 (deftransform into
   "Adds all inputs to the given collection using conj. Ordering of elements

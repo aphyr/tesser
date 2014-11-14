@@ -9,7 +9,7 @@
             [tesser.utils :refer :all]
             [tesser :as t]))
 
-(def test-count 1e2)
+(def test-count 1e1)
 
 (deftest map-sum-test
   (is (= (->> (t/map inc)
@@ -106,6 +106,66 @@
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/into #{}))
                        (set (flatten1 chunks))))))
+
+(defspec take-spec
+  test-count
+  ; Our chunks will be random partitionings of the integers, and we'll take
+  ; them into a vector, then verify it contains n unique elements.
+  (prop/for-all [n     gen/pos-int
+                 sizes (gen/vector gen/pos-int 0 10)]
+;                (prn) (prn)
+                (let [total  (reduce + sizes)
+                      chunks (->> sizes
+                                  (reduce (fn [[start chunks] size]
+                                            [(+ start size)
+                                             (->> start
+                                                  (iterate inc)
+                                                  (take size)
+                                                  (conj chunks))])
+                                          [0 []])
+                                  second)]
+;                  (prn :n n :chunks chunks)
+                  (let [x (->> (t/take n)
+                               (t/into [])
+                               (t/tesser chunks))]
+;                    (prn :total total :n n :result x)
+                    (is (and (or (= (count x) n)         ; Exactly n inputs
+                                 (and (< (count x) n) ; Not enough to hit n
+                                      (= (count x) total)))
+                             ; Unique
+                             (= (count x)
+                                (count (set x)))))))))
+
+(defspec take-take-spec
+  test-count
+  ; Our chunks will be random partitionings of the integers, and we'll take
+  ; them into a vector, then verify it contains n unique elements. Performing
+  ; two takes verifies that the reduced optimizations compose well. :)
+  (prop/for-all [n     gen/pos-int
+                 sizes (gen/vector gen/pos-int 0 10)]
+;                (prn) (prn)
+                (let [total  (reduce + sizes)
+                      chunks (->> sizes
+                                  (reduce (fn [[start chunks] size]
+                                            [(+ start size)
+                                             (->> start
+                                                  (iterate inc)
+                                                  (take size)
+                                                  (conj chunks))])
+                                          [0 []])
+                                  second)]
+;                  (prn :n n :chunks chunks)
+                  (let [x (->> (t/take (inc n))
+                               (t/take n)
+                               (t/into [])
+                               (t/tesser chunks))]
+;                    (prn :total total :n n :result x)
+                    (is (and (or (= (count x) n)         ; Exactly n inputs
+                                 (and (< (count x) n) ; Not enough to hit n
+                                      (= (count x) total)))
+                             ; Unique
+                             (= (count x)
+                                (count (set x)))))))))
 
 (defspec post-combine-spec
   test-count
