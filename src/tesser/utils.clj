@@ -90,66 +90,6 @@
   [path]
   (fn [x] (get-in x path)))
 
-; Extracting key path structure
-
-(defn key-path-compare
-  "Special comparator for building key path structures."
-  [a b]
-  ;  (prn a b)
-  (cond
-    (identical? a b) 0
-
-    (and (sequential? a)
-         (sequential? b))
-    (loop [as a
-           bs b]
-      (let [a (first as)
-            b (first bs)]
-        (cond (and (nil? a) (nil? b))  0
-              (nil? b)                 1
-              (nil? a)                -1
-              true                    (let [c (key-path-compare a b)]
-                                        (if-not (zero? c)
-                                          c
-                                          (recur (next as) (next bs)))))))
-
-    true
-    (try (compare a b)
-         (catch ClassCastException e
-           (compare (name a) (name b))))))
-
-(def key-path-set
-  "Initial set for key paths"
-  (sorted-set-by key-path-compare))
-
-(defn class-sym
-  "Symbol for the class of x. Nil's class sym is nil."
-  [x]
-  (when x
-    (->> x class .getSimpleName symbol)))
-
-(defn key-paths
-  "Given a clojure object, yields a set of all paths through that structure.
-  Keywords as map keys are distinct elements in a path; keys like strings or
-  non-map collections are represented as symbols for their corresponding class."
-  ([x] (key-paths [] x))
-  ([parent-path x]
-   (cond
-     (or (sequential? x) (set? x))
-     (->> x
-          (map (partial key-paths (->> x class-sym (conj parent-path))))
-          (reduce set/union key-path-set))
-
-     (map? x)
-     (->> x
-          (map (fn [[k v]]
-                 (if (keyword? k)
-                   (key-paths (conj parent-path k) v)
-                   (key-paths (->> k class-sym (conj parent-path)) v))))
-          (reduce set/union key-path-set))
-
-     true
-     (->> x class-sym (conj parent-path) (conj key-path-set)))))
 
 (defn complete-triangular-matrix
   "Given a map of [x y] keys to values, returns a map where *both* [x y] and [y

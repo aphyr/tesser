@@ -729,6 +729,7 @@
    :combiner      first-non-nil-reducer
    :post-combiner identity})
 
+
 ;; Numeric folds
 
 (deftransform sum
