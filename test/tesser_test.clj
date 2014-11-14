@@ -9,7 +9,7 @@
             [tesser.utils :refer :all]
             [tesser :as t]))
 
-(def test-count 1e1)
+(def test-count 1e2)
 
 (deftest map-sum-test
   (is (= (->> (t/map inc)
@@ -259,6 +259,34 @@
                       candidates  (set (flatten1 chunks))]
                   (is (or (contains? candidates e)
                           (and (empty? candidates) (nil? e)))))))
+
+;; Comparable folds
+
+(defspec max-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [m (t/tesser chunks (t/max))]
+                  (if (every? empty? chunks)
+                    (nil? m)
+                    (= m (reduce max (flatten1 chunks)))))))
+
+(defspec min-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [m (t/tesser chunks (t/min))]
+                  (if (every? empty? chunks)
+                    (nil? m)
+                    (= m (reduce min (flatten1 chunks)))))))
+
+(defspec range-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [inputs (flatten1 chunks)]
+                  (= (t/tesser chunks (t/range))
+                     (if (every? empty? chunks)
+                       [nil nil]
+                       [(reduce min inputs) (reduce max inputs)])))))
+
 
 ;; Numeric folds
 

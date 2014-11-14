@@ -28,7 +28,7 @@
        (t/reduce +)
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
-  (:refer-clojure :exclude [map mapcat keep filter remove count range
+  (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take])
   (:import (com.clearspring.analytics.stream.quantile QDigest)
            (java.lang.Math))
@@ -730,6 +730,42 @@
    :post-combiner identity})
 
 
+;; Comparable folds
+
+
+(deftransform extremum
+  "Finds the largest element using a comparison function (default: compare)."
+  [compare]
+  (assert (nil? downstream))
+  (letfn [(extremum-reducer [m x]
+            (cond (nil? m)             x
+                  (nil? x)             m
+                  (<= 0 (compare x m)) x
+                  true                 m))]
+    {:identity      (constantly nil)
+     :reducer       extremum-reducer
+     :post-reducer  identity
+     :combiner      extremum-reducer
+     :post-combiner identity}))
+
+(defn min
+  "Finds the smallest value using `compare`."
+  [& [f]]
+  (->> f (extremum (comp - compare))))
+
+(defn max
+  "Finds the largest value using `compare`."
+  [& [f]]
+  (->> f (extremum compare)))
+
+(defn range
+  "Returns a pair of [smallest largest] inputs, using `compare`."
+  [& [f]]
+  (->> f
+       (fuse {:min (min)
+              :max (max)})
+       (post-combine (juxt :min :max))))
+
 ;; Numeric folds
 
 (deftransform sum
@@ -752,7 +788,7 @@
    :post-reducer  identity
    :combiner      (fn combiner [x y] (core/map + x y))
    :post-combiner (fn post-combiner [x]
-                    (double (/ (first x) (max 1 (last x)))))})
+                    (double (/ (first x) (core/max 1 (last x)))))})
 
 (deftransform variance
   "Unbiased variance estimation. Given numeric inputs, returns their variance."
@@ -773,12 +809,12 @@
                    [count
                     (/ (+ (* c m) (* c2 m2)) count)
                     (+ sq sq2 (/ (* (- m2 m) (- m2 m) c c2) count))])))
-   :post-combiner (fn vardiv [x] (double (/ (last x) (max 1 (dec (first x))))))})
+   :post-combiner (fn vardiv [x] (double (/ (last x) (core/max 1 (dec (first x))))))})
 
 (defn standard-deviation
   "Estimates the standard deviation of numeric inputs."
-  [& [downstream]]
-  (->> downstream (variance) (post-combine sqrt)))
+  [& [f]]
+  (->> f (variance) (post-combine sqrt)))
 
 (deftransform covariance
   "Given two functions of an input (fx input) and (fy input), each of which
