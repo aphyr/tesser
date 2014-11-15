@@ -10,7 +10,7 @@
             [tesser.core :as t]
             [tesser.math :as m]))
 
-(def test-count 1e3)
+(def test-count 1e2)
 
 (deftest map-sum-test
   (is (= (->> (t/map inc)
@@ -160,3 +160,23 @@
                             ["y" "z"] yz
                             ["z" "x"] xz
                             ["z" "y"] yz}))))))
+
+
+(defspec quantiles-test
+  test-count
+  (prop/for-all [chunks (gen/such-that (partial some not-empty)
+                                       (chunks gen/pos-int))
+                 q      (gen/fmap #(/ % 1000) (gen/choose 0 1000))]
+                (let [v        (sort (flatten1 chunks))
+                      index    (* q (count v))
+                      ; Round up or down
+                      values   (hash-set (->> (Math/floor index)
+                                              (max 0)
+                                              (min (dec (count v)))
+                                              (nth v))
+                                         (->> (Math/ceil index)
+                                              (min (dec (count v)))
+                                              (max 0)
+                                              (nth v)))
+                      digest   (t/tesser chunks (m/q-digest {}))]
+                  (contains? values (m/quantile digest q)))))

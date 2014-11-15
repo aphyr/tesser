@@ -260,3 +260,60 @@
   instead of maps of :correlation and :count."
   [& args]
   (apply fuse-matrix correlation args))
+
+(defprotocol Quantile
+  (quantile [digest q])
+  (quantile-ranges [digest]))
+
+(extend-protocol Quantile
+  QDigest
+  (quantile [digest q] (.getQuantile digest q))
+  (quantile-ranges [digest] (.toAscRanges digest)))
+
+(defrecord ScaledQDigest [digest offset scale]
+  ; Note that changes to ScaledQDigest's fields must be reflected in
+  ; audience.analysis.hadoop.serialization/fress-handlers
+  Quantile
+  (quantile [_digest q]
+    (-> digest
+        (quantile q)
+        (- offset)
+        (/ scale)))
+  (quantile-ranges [_digest]
+    (core/map
+      (fn [^longs range]
+        (let [range' (double-array 3)]
+          (aset-double range' 0 (-> range (aget 0) (- offset) (/ scale)))
+          (aset-double range' 1 (-> range (aget 1) (- offset) (/ scale)))
+          (aset-double range' 2 (aget range 2))
+          range'))
+      (.toAscRanges digest))))
+
+(deftransform q-digest
+  "Yields a QDigest of the given compression factor over a numeric field. Error
+  in rank proportional to log2(largest-value)/compression. Default compression
+  is 1e6. Ignores nils.
+
+  Options: {:compression 1e6, :scale 1, :offset 0}
+
+  q-digest assumes values are longs; if `scale` is given, rescales inputs by
+  multiplying by `scale`, allowing q-digest to measure fractional values
+  internally. Emitted values will be rescaled back to their original size.
+
+  If `offset` is given, after rescaling, adds `offset` to the resulting value.
+  Allows q-digest to handle negative values. Emitted values will be rescaled
+  back to their original size."
+  [opts]
+  (assert (nil? downstream))
+  (let [compression (or (:compression opts) 1e6)
+        scale       (or (:scale opts)       1)
+        offset      (or (:scale opts)       0)]
+   {:identity #(QDigest. compression)
+    :reducer  (->> (fn reducer [^QDigest digest x]
+                     (when-not (nil? x)
+                       (.offer digest (+ offset (* scale x))) digest)))
+    :post-reducer identity
+    :combiner (fn combiner [^QDigest d1 ^QDigest d2]
+                (QDigest/unionOf d1 d2))
+    :post-combiner (fn post-combiner [digest]
+                     (->ScaledQDigest digest offset scale))}))
