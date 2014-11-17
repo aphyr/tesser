@@ -164,9 +164,11 @@
 
 (defspec quantiles-test
   test-count
-  (prop/for-all [chunks (gen/such-that (partial some not-empty)
-                                       (chunks gen/pos-int))
-                 q      (gen/fmap #(/ % 1000) (gen/choose 0 1000))]
+  (prop/for-all [chunks
+                 (->> (chunks gen/int)
+                      (gen/such-that (partial some not-empty))
+                      (gen/fmap (partial map (partial map #(double (/ % 3))))))
+                 q (gen/fmap #(/ % 1000) (gen/choose 0 1000))]
                 (let [v        (sort (flatten1 chunks))
                       index    (* q (count v))
                       ; Round up or down
@@ -178,5 +180,8 @@
                                               (min (dec (count v)))
                                               (max 0)
                                               (nth v)))
-                      digest   (t/tesser chunks (m/q-digest {}))]
+                      digest   (t/tesser chunks
+                                         (m/q-digest {:scale 1e3
+                                                      :offset 1e10}))]
+                  (prn :values values :q (m/quantile digest q))
                   (contains? values (m/quantile digest q)))))
