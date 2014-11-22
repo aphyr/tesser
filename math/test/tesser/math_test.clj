@@ -21,20 +21,70 @@
 ;; Utility functions
 (defn approx=
   "Equal to within err fraction, or if one is zero, to within err absolute."
-  [err x y]
-  (if (or (zero? x) (zero? y))
-    (< (- err) (- x y) err)
-    (< (- 1 err) (/ x y) (+ 1 err))))
+  ([err x y]
+   (if (or (zero? x) (zero? y))
+     (< (- err) (- x y) err)
+     (< (- 1 err) (/ x y) (+ 1 err))))
+  ([err x y & more]
+   (->> more
+        (cons y)
+        (every? (partial approx= err x)))))
 
 (def =ish
   "Almost equal"
   (partial approx= 1/1000))
+
+(comment
+(let [d      (com.tdunning.math.stats.AVLTreeDigest. 200)
+      inputs [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+              0.3333333333333333 0.0 0.0 0.0]
+      _      (doseq [i inputs]
+               (.add d i))
+      inputs (sort inputs)
+      n      (count inputs)]
+
+  (->> inputs
+       (map-indexed (fn [i x]
+                      (let [q (/ i (dec n))]
+                        (or (<= x
+                                (.quantile d q)
+                                (nth inputs (min (inc i) (dec n))))
+                            (prn :i i :q q :x x :actual
+                                 (.quantile d q))))))
+       (dorun))))
 
 (defn chunks
   "Given a generator for inputs, returns a generator that builds
   sequences of sequences of inputs."
   [input-gen]
   (gen/vector (gen/vector input-gen) 0 5))
+
+; Bug in simple-check: ints don't grow that fast
+(def bigger-ints (gen/sized (fn [size] (gen/resize (* size size) gen/int))))
 
 (defn flatten1
   "Flattens a single level."
@@ -161,27 +211,63 @@
                             ["z" "x"] xz
                             ["z" "y"] yz}))))))
 
-
-(defspec quantiles-test
-  test-count
+(comment
+(defspec t-digest-test
+  1e3
   (prop/for-all [chunks
                  (->> (chunks gen/int)
                       (gen/such-that (partial some not-empty))
-                      (gen/fmap (partial map (partial map #(double (/ % 3))))))
-                 q (gen/fmap #(/ % 1000) (gen/choose 0 1000))]
-                (let [v        (sort (flatten1 chunks))
-                      index    (* q (count v))
-                      ; Round up or down
-                      values   (hash-set (->> (Math/floor index)
-                                              (max 0)
-                                              (min (dec (count v)))
-                                              (nth v))
-                                         (->> (Math/ceil index)
-                                              (min (dec (count v)))
-                                              (max 0)
-                                              (nth v)))
-                      digest   (t/tesser chunks
-                                         (m/q-digest {:scale 1e3
-                                                      :offset 1e10}))]
-                  (prn :values values :q (m/quantile digest q))
-                  (contains? values (m/quantile digest q)))))
+                      (gen/fmap (partial map (partial map #(double (/ % 3))))))]
+                (let [inputs (sort (flatten1 chunks))
+                      n      (count inputs)
+                      digest (t/tesser chunks (m/t-digest {}))]
+                  (if (= n 1)
+                    ; Special case: only one input
+                    (= (first inputs)
+                       (m/quantile digest 0)
+                       (m/quantile digest 1/3)
+                       (m/quantile digest 1/2)
+                       (m/quantile digest 2/3)
+                       (m/quantile digest 1))
+                    ; General case: lots of inputs
+                    (->> inputs
+                         (map-indexed (fn [i x]
+                                        (let [q (/ i (dec n))]
+                                          (or (<= (- x 1e-10)
+                                                  (.quantile digest q)
+                                                  (nth inputs (min (inc i)
+                                                                   (dec n))))
+                                              (prn :i i :q q :x x :actual
+                                                   (m/quantile digest q))))))
+                         (every? true?)))))))
+
+
+(comment
+(defspec t-digest-test
+  1e3
+  (prop/for-all [chunks
+                 (->> (chunks gen/int)
+                      (gen/such-that (partial some not-empty))
+                      (gen/fmap (partial map (partial map #(double (/ % 3))))))]
+                (let [inputs (sort (flatten1 chunks))
+                      n      (count inputs)
+                      digest (t/tesser chunks (m/t-digest {}))]
+                  (if (= n 1)
+                    ; Special case: only one input
+                    (= (first inputs)
+                       (m/quantile digest 0)
+                       (m/quantile digest 1/3)
+                       (m/quantile digest 1/2)
+                       (m/quantile digest 2/3)
+                       (m/quantile digest 1))
+                    ; General case: lots of inputs
+                    (->> inputs
+                         (map-indexed (fn [i x]
+                                        (let [q (/ i (dec n))]
+                                          (or (<= (- x 1e-10)
+                                                  (.quantile digest q)
+                                                  (nth inputs (min (inc i)
+                                                                   (dec n))))
+                                              (prn :i i :q q :x x :actual
+                                                   (m/quantile digest q))))))
+                         (every? true?)))))))
