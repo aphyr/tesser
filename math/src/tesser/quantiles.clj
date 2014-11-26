@@ -87,9 +87,6 @@
   Quantile
   (add-point! [this x]
     (if (neg? x)
-      (prn :storing x "in negatives")
-      (prn :storing x "in positives"))
-    (if (neg? x)
       (add-point! neg (- x))
       (add-point! pos x))
     this)
@@ -105,30 +102,36 @@
        (point-count pos)))
 
   (quantile [this q]
-    (let [neg-count (point-count neg)
-          pos-count (point-count pos)
-          n         (+ neg-count pos-count)
-          neg-frac  (/ neg-count n)
-          pos-frac  (/ pos-count n)]
-      (println "finding quantile" q ": neg" neg-count "pos" pos-count "total"
-               n)
-      (cond (zero? n)
-            ; Do whatever the empty underlying Quantile impl does
+    (let [n (point-count neg)
+          p (point-count pos)
+          N (+ n p)]
+;      (println "finding quantile" q ": neg" n "pos" p "total" N)
+
+      (cond ; No negatives
+            (zero? n)
             (quantile pos q)
 
-            ; In negatives
-            (and (pos? neg-count) (<= q neg-frac))
-            (let [neg-q (- 1 (max 0 (- q (/ n))))]
-              (println "quantile" q "mapped to neg quantile" neg-q "with value"
-                       (- (quantile neg neg-q)))
+            ; No positives
+            (zero? p)
+            (let [neg-q (- 1 (max 0 (- q (/ N))))]
+;              (println "quantile" q "mapped to all-neg quantile" neg-q
+;                       "with value" (- (quantile neg neg-q)))
               (- (quantile neg neg-q)))
 
-            ; In positives
+            ; Falls in negative range
+            (<= q (/ (+ n 1/2) N))
+            (let [neg-q (- 1 (* (/ N n) (- q (/ N))))]
+;              (println "quantile" q "mapped to neg quantile" neg-q "with value"
+;                       (- (quantile neg neg-q)))
+              (- (quantile neg neg-q)))
+
+            ; Falls in positive range
             true
-            (do (println "quantile" q "mapped to pos quantile"
-                         (- 1 (/ (- 1 q) pos-frac)) "with value"
-                         (quantile pos (- 1 (/ (- 1 q) pos-frac))))
-                (quantile pos (- 1 (/ (- 1 q) pos-frac)))))))
+            (let [pos-q (/ (- (* N q) n) p)]
+;              (println "quantile" q "mapped to pos quantile"
+;                       pos-q "with value" (quantile pos pos-q))
+              (quantile pos pos-q)))))
+
   Buffers
   (buf-capacity [this]
     (+ (buf-capacity neg) (buf-capacity pos)))

@@ -108,6 +108,7 @@
 (defspec double-histogram-spec
   1e3
   (prop/for-all [points (runs (gen/fmap #(/ % 1e1) bigger-ints))]
+                        ; (gen/vector gen/int)]
                 (prn)
                 (prn)
                 (prn :points points)
