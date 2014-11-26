@@ -105,13 +105,22 @@
                           (gen/return
                             (mapcat repeat run-lengths values)))))))
 
+(defn smaller
+  "Make numbers smaller"
+  [x]
+  (double (/ x 100)))
+
 (defspec double-histogram-spec
-  1e3
-  (prop/for-all [points (runs (gen/fmap #(/ % 1e1) bigger-ints))]
-                        ; (gen/vector gen/int)]
-                (prn)
-                (prn)
-                (prn :points points)
+  1e4
+  (prop/for-all [points (gen/vector (gen/fmap smaller bigger-ints))]
+                (check-digest (q/dual
+                                q/hdr-histogram
+                                {:highest-to-lowest-value-ratio 1e8
+                                 :significant-value-digits      3}) points)))
+
+(defspec double-histogram-runs-spec
+  1e2
+  (prop/for-all [points (runs (gen/fmap smaller bigger-ints))]
                 (check-digest (q/dual
                                 q/hdr-histogram
                                 {:highest-to-lowest-value-ratio 1e8
