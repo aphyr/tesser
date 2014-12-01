@@ -5,8 +5,8 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
   :dependencies [[tesser.core "0.1.0-SNAPSHOT"]
-;                 [com.tdunning/t-digest "3.0"]
-;                 [com.clearspring.analytics/stream "2.7.0"]
+                 [com.tdunning/t-digest "3.0"]
+                 [com.clearspring.analytics/stream "2.7.0"]
                  [org.hdrhistogram/HdrHistogram "2.0.3"]
                  [org.clojure/math.combinatorics "0.0.8"]
                  [org.clojure/math.numeric-tower "0.0.4"]]
