@@ -7,7 +7,8 @@
                  [tesser.math "0.1.0-SNAPSHOT"]]
   :codox {:sources ["../core/src/"
                     "../math/src"]
-          :src-dir-uri "http://github.com/aphyr/tesser/blob/master/"
+          ; Huh, codox strips off a master.
+          :src-dir-uri "http://github.com/aphyr/tesser/blob/master/master/"
           :src-linenum-anchor-prefix "L"
           :defaults {:doc/format :markdown}}
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]]}})
