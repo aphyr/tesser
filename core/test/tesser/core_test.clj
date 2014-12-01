@@ -8,7 +8,12 @@
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
-(def test-count 1e3)
+(def test-count 1e2)
+
+(defn option
+  "Generator that may return nil."
+  [gen]
+  (gen/one-of [(gen/return nil) gen]))
 
 (defn chunks
   "Given a generator for inputs, returns a generator that builds
@@ -234,6 +239,13 @@
                       candidates  (set (flatten1 chunks))]
                   (is (or (contains? candidates e)
                           (and (empty? candidates) (nil? e)))))))
+
+;; Predicate folds
+(defspec empty?-spec
+  1e3
+  (prop/for-all [chunks (chunks (option gen/boolean))]
+                (is (= (t/tesser chunks (t/empty?))
+                       (empty? (flatten1 chunks))))))
 
 ;; Comparable folds
 

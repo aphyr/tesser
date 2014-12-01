@@ -32,7 +32,7 @@
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
-                            frequencies into set some take])
+                            frequencies into set some take empty?])
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
@@ -649,7 +649,7 @@
         combiners      (core/map :combiner folds)]
     ; We're gonna project into a particular key basis vector for the
     ; reduce/combine steps
-    {:identity      (if (empty? fold-map)
+    {:identity      (if (core/empty? fold-map)
                        (constantly []) ; juxt can't take zero args
                        (apply juxt (core/map :identity folds)))
       :reducer       (fn reducer [accs x]
@@ -718,6 +718,7 @@
    :combiner      first-non-nil-reducer
    :post-combiner identity})
 
+
 (deftransform any
   "Returns any single input from the collection. O(chunks)."
   []
@@ -729,8 +730,19 @@
    :post-combiner identity})
 
 
-;; Comparable folds
+;; Predicate folds
 
+(defn empty?
+  "Returns true iff no inputs arrive; false otherwise.
+
+    (t/tesser [[]] (t/empty?))
+    ; => true"
+  []
+  (->> (map (fn [_] true))
+       (some true?)
+       (post-combine (complement boolean))))
+
+;; Comparable folds
 
 (deftransform extremum
   "Finds the largest element using a comparison function (default: compare)."
