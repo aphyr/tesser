@@ -1,12 +1,9 @@
-*/target
-*/classes
-*/checkouts
-*/doc
+/target
+/classes
+/checkouts
 pom.xml
 pom.xml.asc
 *.jar
 *.class
-*.hprof
-.*.swp
 /.lein-*
 /.nrepl-port
