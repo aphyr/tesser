@@ -123,8 +123,8 @@
   [digest points]
   (fill! digest points)
     (and (check-count digest points)
-         (check-quantiles digest points)
-         (check-distribution digest points)))
+         (check-quantiles digest points)))
+;         (check-distribution digest points)))
 
 (defn runs
   "Quickcheck likes to emit uniformly distributed vectors, but we need
