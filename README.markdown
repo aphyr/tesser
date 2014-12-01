@@ -22,7 +22,7 @@ Tesser explores a different niche. It offers:
 
 - *Commutativity.* Tesser folds must not depend on the order of inputs.
 - *Concurrency.* Reductions over independent chunks require no coordination,
-  making them good candidates for running indistributed contexts like Hadoop.
+  making them good candidates for distributed contexts like Hadoop.
 - *Stream fusion.* Like Reducers and Transducers, `map`, `filter`, etc. are all
   folded into a single reduction function. Intermediate values are
   stack-allocated, reducing GC load.
