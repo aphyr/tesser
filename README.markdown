@@ -135,7 +135,7 @@ Coming soon.
 ## Contributors
 
 - [Kyle Kingsbury](mailto:aphyr@aphyr.com)
-- Natasha Whitney
+- [Natasha Whitney](mailto:natiwhitney@gmail.com) 
 - Factual, Inc
 
 ## License
