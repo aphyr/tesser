@@ -242,10 +242,16 @@
 
 ;; Predicate folds
 (defspec empty?-spec
-  1e3
+  test-count
   (prop/for-all [chunks (chunks (option gen/boolean))]
                 (is (= (t/tesser chunks (t/empty?))
                        (empty? (flatten1 chunks))))))
+
+(defspec every?-spec
+  1e3
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (t/tesser chunks (t/every? odd?))
+                       (every? odd? (flatten1 chunks))))))
 
 ;; Comparable folds
 

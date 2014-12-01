@@ -32,7 +32,7 @@
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
-                            frequencies into set some take empty?])
+                            frequencies into set some take empty? every? not-every?])
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
@@ -737,10 +737,18 @@
 
     (t/tesser [[]] (t/empty?))
     ; => true"
-  []
-  (->> (map (fn [_] true))
+  [& [f]]
+  (->> f
+       (map (fn [_] true))
        (some true?)
        (post-combine (complement boolean))))
+
+(defn every?
+  "True if every element satisfies the given predicate, false otherwise."
+  [pred & [f]]
+  (->> f
+       (remove pred)
+       (empty?)))
 
 ;; Comparable folds
 
