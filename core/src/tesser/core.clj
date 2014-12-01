@@ -1,5 +1,8 @@
 (ns tesser.core
-  "\"Now we will tesser, we will wrinkle again. Do you understand?\" \"No,\"
+  "The essential folds: map, mapcat, take, filter, some, any?, into, etc, plus
+  common fold combinators.
+
+  \"Now we will tesser, we will wrinkle again. Do you understand?\" \"No,\"
   Meg said flatly. Mrs. Whatsit sighed. \"Explanations are not easy when they
   are about things for which your civilization still has no words. Calvin
   talked about traveling at the speed of light. You understand that, little
