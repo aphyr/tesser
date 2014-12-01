@@ -42,7 +42,10 @@ Via Clojars, as usual.
 ## Core
 
 [Tesser.core](http://aphyr.github.io/tesser/tesser.core.html) looks a lot like
-the Clojure seq API, but without preserving order, and running in parallel.
+the Clojure seq API, and many of its functions have similar names. Their
+semantics differ, however: Tesser folds do not preserve the order of inputs,
+and when executed, they run in *parallel*.
+
 Applying a fold using `tesser.core/tesser` uses mutiple threads proportional to
 processor cores. Unlike reducers, we don't use the Java forkjoin pool, just
 plain old threads. I've seen too many weird performance issues compared to
@@ -70,7 +73,7 @@ reductions to be done in a single pass, possibly sharing expensive operations
 like deserialization. This is a particularly effective way of working with a
 set of data files on disk or in Hadoop.
 
-Given JSON records about a codebase like like
+Given JSON records about a codebase like
 
 ```clj
 {"year":         2004,
@@ -131,9 +134,9 @@ Coming soon.
 
 ## Contributors
 
-Kyle Kingsbury <aphyr@aphyr.com>
-Natasha Whitney
-Factual, Inc
+- Kyle Kingsbury <aphyr@aphyr.com>
+- Natasha Whitney
+- Factual, Inc
 
 ## License
 
