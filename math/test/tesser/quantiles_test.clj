@@ -84,12 +84,47 @@
         (or (check-quantiles-exact qc)
             (and (check-quantiles-correlation qc)))))))
 
+(defn check-distribution
+  "Verifies that the cumulative distribution over the digest matches the
+  points."
+  [digest points]
+  (testing "cumulative distribution"
+    (if (empty? points)
+      (is (= [] (q/cumulative-distribution digest)))
+
+      (let [digest-dist (q/cumulative-distribution digest)
+            cutoffs     (map first digest-dist)
+            real-dist   (loop [[cutoff & cutoffs' :as cutoffs] cutoffs
+                               [point  & points'  :as points]  (sort points)
+                               dist                               []
+                               total                              0]
+                          (cond ; Stretch the cutoff to the next point
+                                (nil? cutoff)
+                                (recur [point] points dist total)
+
+                                ; Done!
+                                (nil? point)
+                                (conj dist [cutoff total])
+
+                                (<= point cutoff)
+                                (recur cutoffs points' dist (inc total))
+
+                                true
+                                (recur cutoffs' points
+                                       (conj dist [cutoff total])
+                                       total)))]
+        (or (is (= digest-dist real-dist))
+            (prn :points points)
+            (prn :digest digest-dist)
+            (prn :actual real-dist))))))
+
 (defn check-digest
   "Check that a quantile estimator handles a given set of inputs OK."
   [digest points]
   (fill! digest points)
     (and (check-count digest points)
-         (check-quantiles digest points)))
+         (check-quantiles digest points)
+         (check-distribution digest points)))
 
 (defn runs
   "Quickcheck likes to emit uniformly distributed vectors, but we need
@@ -110,7 +145,17 @@
   [x]
   (double (/ x 100)))
 
-(defspec double-histogram-spec
+
+(defspec hdr-histogram-spec
+  1e4
+  (prop/for-all [points (gen/vector gen/int)]
+                (check-digest (q/dual
+                                q/hdr-histogram
+                                {:highest-to-lowest-value-ratio 1e2
+                                 :significant-value-digits      3}) points)))
+
+(comment
+(defspec hdr-histogram-spec
   1e4
   (prop/for-all [points (gen/vector (gen/fmap smaller bigger-ints))]
                 (check-digest (q/dual
@@ -118,10 +163,10 @@
                                 {:highest-to-lowest-value-ratio 1e8
                                  :significant-value-digits      3}) points)))
 
-(defspec double-histogram-runs-spec
+(defspec hdr-histogram-runs-spec
   1e2
   (prop/for-all [points (runs (gen/fmap smaller bigger-ints))]
                 (check-digest (q/dual
                                 q/hdr-histogram
                                 {:highest-to-lowest-value-ratio 1e8
-                                 :significant-value-digits      3}) points)))
+                                 :significant-value-digits      3}) points))))

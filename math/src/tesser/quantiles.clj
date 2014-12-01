@@ -1,9 +1,9 @@
 (ns tesser.quantiles
   "Supports various streaming quantile sketches"
-  (:import (com.clearspring.analytics.stream.quantile QDigest)
-           (org.HdrHistogram EncodableHistogram
-                             DoubleHistogram)
-           (com.tdunning.math.stats AVLTreeDigest)
+  (:refer-clojure :exclude [min max])
+  (:import (org.HdrHistogram EncodableHistogram
+                             DoubleHistogram
+                             HistogramIterationValue)
            (java.nio ByteBuffer)
            (java.util.zip Deflater))
   (:require [tesser.utils :refer :all]
@@ -13,12 +13,32 @@
             [clojure.set  :as set]
             [clojure.core :as core]))
 
-(defn ^"[B" byte-buffer->bytes
-  "Convert a byte buffer to a byte array."
-  [^ByteBuffer buffer]
-  (let [array (byte-array (.remaining buffer))]
-    (.get buffer array)
-    array))
+(defprotocol Digest
+  (add-point! [digest x]
+              "Add a value to the given digest, mutating the digest.")
+  (merge-digest! [digest other]
+                 "Merges the second digest into the first, mutating the
+                 first.")
+  (point-count [digest]
+               "How many points went into this digest?"))
+
+(defprotocol Quantile
+  (min       [digest] "The minimum point in the digest.")
+  (max       [digest] "The maximum point in the digest.")
+  (quantile  [digest q]  "Returns a point near the given quantile."))
+
+(defprotocol CumulativeDistribution
+  (cumulative-distribution [digest]
+                "STILL BROKEN, SO SORRY!
+
+                A non-normalized discrete cumulative distribution function for
+                a digest, represented as an ascending-order sequence of `[point
+                total]` pairs, where `total` is the number of points in the
+                digest which are less than or equal to `point`. `point` ranges
+                from min to max, inclusive.
+
+                The cumulative distribution for an empty digest is an empty
+                seq."))
 
 (defprotocol Buffers
   (buf-capacity [x] "How many bytes are we gonna need, tops?")
@@ -27,6 +47,13 @@
                                 position advanced.")
   (read-buf!  [x ^ByteBuffer b] "Read a new instance of x from byte buffer b.
                                 Mutates b by advancing the position."))
+
+(defn ^"[B" byte-buffer->bytes
+  "Convert a byte buffer to a byte array."
+  [^ByteBuffer buffer]
+  (let [array (byte-array (.remaining buffer))]
+    (.get buffer array)
+    array))
 
 (defn write-buf
   "Write the given thing to a fresh ByteBuffer and returns that buffer, flipped
@@ -37,32 +64,43 @@
      (.flip buf)
      buf)))
 
-(defprotocol Quantile
-  (add-point!     [digest x] "Add a value to the given digest, mutating the
-                         digest.")
-  (merge-digest!  [digest other] "Merges the second digest into the first,
-                                 mutating the first.")
-  (point-count    [digest] "How many points went into this digest?")
-  (quantile       [digest q]  "Returns a point near the given quantile."))
+; TODO: dynamically detect dependencies and load these extensions
+; I'd include em all by default but the jar gets *massive*
+;(extend-type AVLTreeDigest
+;  Quantile
+;  (add-point!       [digest x] (.add digest x))
+;  (merge-digest!    [digest ^AVLTreeDigest d] (.add digest d))
+;  (point-count      [digest]   (.size digest))
+;  (quantile         [digest q] (.quantile digest q))
 
-(extend-type AVLTreeDigest
-  Quantile
-  (add-point!       [digest x] (.add digest x))
-  (merge-digest!    [digest ^AVLTreeDigest d] (.add digest d))
-  (point-count      [digest]   (.size digest))
-  (quantile         [digest q] (.quantile digest q))
-
-  Buffers
-  (buf-capacity     [digest]   (.smallByteSize digest))
-  (write-buf!       [digest b] (.asSmallBytes digest b)
-  (read-buf!        [digest b] (AVLTreeDigest/fromBytes b))))
+;  Buffers
+;  (buf-capacity     [digest]   (.smallByteSize digest))
+;  (write-buf!       [digest b] (.asSmallBytes digest b)
+;  (read-buf!        [digest b] (AVLTreeDigest/fromBytes b))))
 
 (extend-type DoubleHistogram
-  Quantile
+  Digest
   (add-point!       [digest x] (.recordValue digest x))
   (merge-digest!    [digest ^DoubleHistogram d] (.add digest d))
   (point-count      [digest]   (.getTotalCount digest))
-  (quantile         [digest q] (.getValueAtPercentile digest (* q 100)))
+
+  Quantile
+  (min      [digest]   (.getMinValue digest))
+  (max      [digest]   (.getMaxValue digest))
+  (quantile [digest q] (.getValueAtPercentile digest (* q 100)))
+
+  CumulativeDistribution
+  (cumulative-distribution [digest]
+    ; multiply by conversion factor to correct for
+    ; https://github.com/HdrHistogram/HdrHistogram/issues/35
+    (->> digest
+         ;.allValues
+         .recordedValues
+         .iterator
+         iterator-seq
+         (map (fn [^HistogramIterationValue i]
+                [(.getDoubleValueIteratedTo i)
+                 (.getTotalCountToThisValue i)]))))
 
   Buffers
   (buf-capacity     [digest] (.getNeededByteBufferCapacity digest))
@@ -84,7 +122,7 @@
 ; A histogram that covers both negative and positive numbers by routing to
 ; two distinct histograms. 0 is considered positive here.
 (defrecord DualHistogram [neg pos]
-  Quantile
+  Digest
   (add-point! [this x]
     (if (neg? x)
       (add-point! neg (- x))
@@ -101,6 +139,7 @@
     (+ (point-count neg)
        (point-count pos)))
 
+  Quantile
   (quantile [this q]
     (let [n (point-count neg)
           p (point-count pos)
@@ -113,7 +152,7 @@
 
             ; No positives
             (zero? p)
-            (let [neg-q (- 1 (max 0 (- q (/ N))))]
+            (let [neg-q (- 1 (clojure.core/max 0 (- q (/ N))))]
 ;              (println "quantile" q "mapped to all-neg quantile" neg-q
 ;                       "with value" (- (quantile neg neg-q)))
               (- (quantile neg neg-q)))
@@ -131,6 +170,26 @@
 ;              (println "quantile" q "mapped to pos quantile"
 ;                       pos-q "with value" (quantile pos pos-q))
               (quantile pos pos-q)))))
+
+  CumulativeDistribution
+  (cumulative-distribution [this]
+    (cond
+      (zero? (point-count neg))
+      (cumulative-distribution pos)
+
+      ;     (zero? (point-count pos))
+      ;     (cumulative-distribution neg)
+
+      true
+      (let [neg-dist (cumulative-distribution neg)
+            offset   (point-count neg)]
+        (concat (->> neg-dist
+                     reverse
+                     (map (fn [[point total]]
+                            [(- point) total])))
+                (->> (cumulative-distribution pos)
+                     (map (fn [[point total]]
+                            [point (+ total offset)])))))))
 
   Buffers
   (buf-capacity [this]
