@@ -253,6 +253,12 @@
                 (is (= (t/tesser chunks (t/every? odd?))
                        (every? odd? (flatten1 chunks))))))
 
+(defspec not-every?-spec
+  1e3
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (t/tesser chunks (t/not-every? odd?))
+                       (not-every? odd? (flatten1 chunks))))))
+
 ;; Comparable folds
 
 (defspec max-spec

@@ -744,11 +744,24 @@
        (post-combine (complement boolean))))
 
 (defn every?
-  "True if every element satisfies the given predicate, false otherwise."
+  "True iff every input satisfies the given predicate, false otherwise.
+
+    (t/tesser [[1 3 5]] (t/every? odd?))
+    ; => true"
   [pred & [f]]
   (->> f
        (remove pred)
        (empty?)))
+
+(defn not-every?
+  "True if there exists an input which does *not* satisfy the given predicate.
+
+    (t/tesser [[1 3 5] [6]] (t/not-every? odd?))
+    ; => true"
+  [pred & [f]]
+  (->> f
+       (every? pred)
+       (post-combine not)))
 
 ;; Comparable folds
 
