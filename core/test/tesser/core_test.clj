@@ -227,10 +227,8 @@
 (defspec some-spec
   test-count
   (prop/for-all [chunks (chunks gen/int)]
-                (let [e          (t/tesser chunks (t/some even?))
-                      candidates (set (filter even? (flatten1 chunks)))]
-                  (is (or (contains? candidates e)
-                          (and (empty? candidates) (nil? e)))))))
+                (is (= (t/tesser chunks (t/some #{1}))
+                       (some #{1} (flatten1 chunks))))))
 
 (defspec any-spec
   test-count
@@ -248,13 +246,13 @@
                        (empty? (flatten1 chunks))))))
 
 (defspec every?-spec
-  1e3
+  test-count
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/every? odd?))
                        (every? odd? (flatten1 chunks))))))
 
 (defspec not-every?-spec
-  1e3
+  test-count
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/not-every? odd?))
                        (not-every? odd? (flatten1 chunks))))))

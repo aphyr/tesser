@@ -702,22 +702,24 @@
    :post-combiner identity})
 
 (deftransform some
-  "Returns any input from the collection that satisfies the given predicate;
-  e.g. (pred input) is truthy. If no such input exists, returns nil.
+  "Returns the first logical true value of (pred input). If no such satisfying
+  input exists, returns nil.
 
   This is potentially *less* efficient than clojure.core/some because each
   reducer has to find a matching element independently, and they have no way to
   communicate when one has found an element. In the worst-case scenario,
   requires N calls to `pred`. However, unlike clojure.core/some, this version
-  is parallelizable--which can make it more efficient."
+  is parallelizable--which can make it more efficient when the element is rare.
+
+    (t/tesser [[1 2 3] [4 5 6]] (t/some #{1 2}))
+    ; => 1"
   [pred]
   (assert (nil? downstream))
   {:identity      (constantly nil)
-   :reducer       (fn reducer [_ x] (when (pred x) (reduced x)))
+   :reducer       (fn reducer [_ x] (when-let [v (pred x)] (reduced v)))
    :post-reducer  identity
    :combiner      first-non-nil-reducer
    :post-combiner identity})
-
 
 (deftransform any
   "Returns any single input from the collection. O(chunks)."
