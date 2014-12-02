@@ -32,7 +32,8 @@
        (t/tesser [[1 2 3] [4 5 6]]))
   ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
-                            frequencies into set some take empty? every? not-every?])
+                            frequencies into set some take empty? every?
+                            not-every? replace])
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
@@ -238,7 +239,7 @@
   [fold]
   (->> fold
        reverse
-       (reduce (fn [compiled adhere] (adhere compiled))
+       (reduce (fn [compiled build] (build compiled))
                nil)
        assert-compiled-fold))
 
@@ -308,7 +309,7 @@
        (map f []))
       ([f fold]
        (append fold
-               (fn adhere [{:keys [reducer] :as downstream}]
+               (fn build [{:keys [reducer] :as downstream}]
                  (assoc downstream :reducer
                         (fn reducer [acc input] (reducer acc (f input)))))))))
 
@@ -327,7 +328,7 @@
      ; Version with fold argument
      ([~@args fold#]
       (~conjoiner fold#
-                  (fn adhere [~'downstream]
+                  (fn build [~'downstream]
                     (let ~'[identity-      (:identity downstream)
                             reducer-       (:reducer downstream)
                             post-reducer-  (:post-reducer downstream)
@@ -355,6 +356,18 @@
   [f]
   (assoc downstream :reducer (fn reducer [acc x]
                                (reducer- acc (f x)))))
+
+(defn replace
+  "Given a map of replacement pairs, maps any inputs which are keys in the map
+  to their corresponding values. Leaves unrecognized inputs alone.
+
+    (->> (t/replace {:x false})
+         (t/into [])
+         (t/tesser [[:x :y]]))
+    ; => [false :y]"
+  [m & [f]]
+  (->> f
+       (map (fn sub [x] (get m x x)))))
 
 (deftransform mapcat
   "Takes a function `f` and an optional fold. Returns a version of the fold
@@ -730,7 +743,6 @@
    :post-reducer  identity
    :combiner      first-non-nil-reducer
    :post-combiner identity})
-
 
 ;; Predicate folds
 

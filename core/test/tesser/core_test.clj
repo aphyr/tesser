@@ -41,6 +41,20 @@
                             (map (partial * 2))
                             (into (multiset)))))))
 
+(defspec replace-spec
+  1e3
+  (prop/for-all [chunks (chunks (option gen/boolean))]
+                (let [subs {true nil
+                            nil false
+                            false true}]
+                  (is (= (->> (t/replace subs)
+                              (t/into (multiset))
+                              (t/tesser chunks))
+                         (->> chunks
+                              flatten1
+                              (replace subs)
+                              (into (multiset))))))))
+
 (defspec mapcat-spec
   test-count
   (prop/for-all [chunks (chunks gen/int)]
