@@ -33,7 +33,7 @@
   ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
-                            not-every? replace])
+                            not-every? replace group-by])
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
@@ -582,6 +582,40 @@
 
 ;; Splitting folds
 
+(deftransform group-by
+  "Every input belongs to exactly one category, and you'd like to apply a fold
+  to each category separately.
+
+  Group-by takes a function that returns a category for every element, and
+  returns a map of those categories to the results of the downstream fold
+  applied to the inputs in that category.
+
+  For instance, say we have a collection of particles of various types, and
+  want to find the highest mass of each particle type:
+
+    (->> (t/group-by :type)
+         (t/map :mass)
+         (t/max)
+         (t/tesser [[{:name :electron, :type :lepton, :mass 0.51}
+                     {:name :muon,     :type :lepton, :mass 105.65}
+                     {:name :up,       :type :quark,  :mass 1.5}
+                     {:name :down,     :type :quark,  :mass 3.5}]]))
+    ; => {:lepton 105.65, :quark 3.5}"
+  [category-fn]
+  {:identity        (constantly {})
+   :reducer         (fn reducer [acc input]
+                      (let [category (category-fn input)]
+                        (assoc acc category
+                               (reducer-
+                                 ; TODO: invoke downstream identity only when
+                                 ; necessary.
+                                 (get acc category (identity-)) input))))
+   :post-reducer    identity
+   :combiner        (fn combiner [m1 m2]
+                      (merge-with combiner- m1 m2))
+   :post-combiner   (fn post-combiner [m]
+                      (map-vals post-combiner- m))})
+
 (deftransform facet
   "Your inputs are maps, and you want to apply a fold to each value
   independently. Facet generalizes a fold over a single value to operate on
@@ -776,6 +810,8 @@
   (->> f
        (every? pred)
        (post-combine not)))
+
+;;TODO: distinct?, not-any?
 
 ;; Comparable folds
 

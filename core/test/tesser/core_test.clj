@@ -191,6 +191,18 @@
 
 ;; Splitting folds
 
+(defspec group-by-spec
+  test-count
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [g #(mod % 3)]
+                  (is (= (->> (t/group-by g)
+                              (t/into (multiset))
+                              (t/tesser chunks))
+                         (->> (flatten1 chunks)
+                              (group-by g)
+                              (map (fn [[k vs]] [k (apply multiset vs)]))
+                              (into {})))))))
+
 (defspec facet-spec
   test-count
   ; Sum over maps of keywords to ints
