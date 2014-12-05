@@ -8,7 +8,7 @@
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
-(def test-count 1e2)
+(def test-count 1e3)
 
 (defn option
   "Generator that may return nil."

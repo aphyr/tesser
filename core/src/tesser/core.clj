@@ -245,15 +245,21 @@
 
 (defn tesser
   "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
-  num-procs * 2 threads for the parallel (reducer) portion of the fold."
+  num-procs threads for the parallel (reducer) portion of the fold. Reducers
+  take turns combining their results, which prevents unbounded memory
+  consumption by the reduce phase."
   [seqs fold]
-  (let [fold    (compile-fold fold)
-        t0      (System/nanoTime)
-        threads (* 2 (.. Runtime getRuntime availableProcessors))
-        queue   (atom seqs)
-        results (atom [])
-        chunks  (atom 0)
-        stats   (measure/periodically 1 (println @chunks "chunks read"))]
+  (let [fold     (compile-fold fold)
+        t0       (System/nanoTime)
+        threads  (.. Runtime getRuntime availableProcessors)
+        queue    (atom seqs)
+        combiner (fn combiner [combined x]
+                   (if (reduced? combined)
+                     combined
+                     ((:combiner fold) combined x)))
+        combined (atom ((:identity fold)))
+        chunks   (atom 0)
+        stats    (measure/periodically 1 (println @chunks "chunks processed"))]
     (try
       (let [workers (->> threads
                          core/range
@@ -262,13 +268,22 @@
                              (future
                                (while
                                  (when-let [seq (poll! queue)]
+                                   ; Concurrent reduction
                                    (let [result (->> seq
                                                      (reduce (:reducer fold)
                                                              ((:identity fold)))
                                                      ((:post-reducer fold)))]
-                                     (swap! results conj result)
-                                     (swap! chunks inc)
-                                     true)))))))]
+
+                                     ; Sequential combine phase
+                                     (let [combined'
+                                           (locking combined
+                                             (swap! combined combiner result))]
+
+                                         ; Update stats
+                                         (swap! chunks inc)
+
+                                         ; Abort early if reduced.
+                                         (not (reduced? combined'))))))))))]
         (try
           ; Wait for workers
           (core/mapv deref workers)
@@ -276,14 +291,17 @@
           ; Stop printing stats
           (stats)
 
-          (let [out   (->> results
-                           deref
-                           (reduce (:combiner fold) ((:identity fold)))
-                           ((:post-combiner fold)))
+          (let [combined @combined
+                ; Unwrap reduced
+                combined (if (reduced? combined) @combined combined)
+
+                ; Postcombine
+                result ((:post-combiner fold) combined)
+
                 t1    (System/nanoTime)]
             (when (< 1e8 (- t1 t0))
               (println (format "Time: %.2f seconds" (/ (- t1 t0) 1e9))))
-            out)
+            result)
 
           (finally
             ; Ensure workers are dead
