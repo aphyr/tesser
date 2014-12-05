@@ -258,8 +258,8 @@
                      combined
                      ((:combiner fold) combined x)))
         combined (atom ((:identity fold)))
-        chunks   (atom 0)
-        stats    (measure/periodically 1 (println @chunks "chunks processed"))]
+        chunks   (atom 0)]
+;        stats    (measure/periodically 1 (println @chunks "chunks processed"))]
     (try
       (let [workers (->> threads
                          core/range
@@ -280,7 +280,7 @@
                                              (swap! combined combiner result))]
 
                                          ; Update stats
-                                         (swap! chunks inc)
+;                                         (swap! chunks inc)
 
                                          ; Abort early if reduced.
                                          (not (reduced? combined'))))))))))]
@@ -289,7 +289,7 @@
           (core/mapv deref workers)
 
           ; Stop printing stats
-          (stats)
+;          (stats)
 
           (let [combined @combined
                 ; Unwrap reduced
@@ -299,8 +299,8 @@
                 result ((:post-combiner fold) combined)
 
                 t1    (System/nanoTime)]
-            (when (< 1e8 (- t1 t0))
-              (println (format "Time: %.2f seconds" (/ (- t1 t0) 1e9))))
+;            (when (< 1e8 (- t1 t0))
+;              (println (format "Time: %.2f seconds" (/ (- t1 t0) 1e9))))
             result)
 
           (finally
@@ -309,11 +309,10 @@
 
       (finally
         ; Stop printing stats
-        (stats)
+;        (stats)
 
         ; Force seq realization so we can close filehandles
         (dorun seqs)))))
-
 
 ; Defining transforms
 
