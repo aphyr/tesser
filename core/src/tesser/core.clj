@@ -35,7 +35,7 @@
                             frequencies into set some take empty? every?
                             not-every? replace group-by])
   (:require [clojure.core.typed :as typed
-             :refer [ann ann-form tc-ignore All U I HMap IFn Fn Any Seqable
+             :refer [ann ann-form tc-ignore All U I HMap TFn IFn Fn Any Seqable
                      HSequential Nothing NonEmptySeqable defalias]]
             [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
@@ -223,43 +223,65 @@
 
 (defalias Fold
   "A compiled fold is a map of specific keys to functions for each part of the
-  reduction process."
-  ; Do I really want contravariance here? The typechecker complains that
-  ; reducer-input is used in contravariant position, but I don't understand
-  ; what that means for functions. Should I drop reducer-input and say Any?
+  reduction process. It ultimately takes reducer inputs to an output."
   (TFn [[reducer-input  :variance :contravariant]
         [reducer-acc    :variance :invariant]
         [combiner-input :variance :invariant]
-        [combiner-acc   :variance :invariant]]
+        [combiner-acc   :variance :invariant]
+        [output         :variance :covariant]]
        (HMap :complete? true
              :mandatory
              {:identity      (IFn [-> (I reducer-acc combiner-acc)])
               :reducer       (IFn [reducer-acc reducer-input -> reducer-acc])
               :post-reducer  (IFn [reducer-acc -> combiner-input])
               :combiner      (IFn [combiner-acc combiner-input -> combiner-acc])
-              :post-combiner (IFn [combiner-acc -> Any])})))
+              :post-combiner (IFn [combiner-acc -> output])})))
 
-(defalias Terminal
-  "A function that takes *no* downstream fold, returning a Fold from
-  whole cloth."
-  [nil -> Fold])
+(defalias AnyFold
+  "A fold of any types."
+  (Fold Any Any Any Any Any))
 
-(defalias Transform
-  "A transform is a function that transforms a downstream Fold."
-  [Fold -> Fold])
-
-(defalias IncompleteFold
-  "A sequence of transforms without a Terminal."
-  (Seqable Transform))
-
-(defalias CompleteFold
-  "A sequence of transforms ending with a Terminal. I don't know how to enforce
-  this type."
-  (NonEmptySeqable (U Transform Terminal)))
+; What is the type of (map float)?
+;
+; Two forms: (map float) and (map float builder)
+;
+; (map float) takes a fold which accepts floats and generalizes it to take any
+; number.
+;
+;   (All [a b c d]
+;     [(Fold Float a b c d) -> (Fold Num a b c d)])
+;
+; (map float (map parse-int))
+;
+; This fold takes Strings and maps them to Ints, then Floats, then passes em
+; downstream to something else. We're going to return a function of a Fold
+; which accepts Floats, and returns a Fold that accepts Strings.
+;
+; (All [a b c d]
+;   [(Fold Float a b c d) -> (Fold String a b c d)])
+;
+; So in (map float x), we're taking a [Num -> Float] and a [Fold -> Fold'] and
+; generating a function that takes a Fold accepting Floats and returns a Fold
+; accepting Nums.
+;
+; (All [in in' a b c d f]
+;   [[in -> in']
+;    [(Fold in a b c d) -> f]
+;    -> [(Fold in' a b c d) -> f]])
+;
+; The other type of composition we do goes to the *end*, like (postcombine).
+;
+; (postcombine str (sum)) gives a fold which gives the *string* version of a
+; sum.
+;
+; (All [out out']
+;   [[out -> out']
+;    [f -> (Fold a b c d out)]
+;    -> [f -> (Fold a b c d out')]])
 
 ;; Compiling and executing folds
 
-(ann  assert-compiled-fold [Fold -> Fold])
+(ann  assert-compiled-fold (All [[f :< AnyFold]] [f -> f]))
 (defn assert-compiled-fold
   "Is this a valid compiled fold?"
   [f]
@@ -272,46 +294,27 @@
           (str (pr-str f) " is missing a :post-combiner fn"))
   f)
 
-; These are no-check because core.typed can't type CompleteFold as
-; [Transform * Terminal], only (U Transform Terminal).
-(ann ^:no-check terminal [CompleteFold -> Terminal])
-(defn terminal
-  "The terminal fold generator from an uncompiled fold sequence."
-  [fold]
-  (assert (not-empty fold))
-  (last fold))
-
-(ann ^:no-check transforms [CompleteFold -> (Seqable Transform)])
-(defn transforms
-  "The transforms from an uncompiled fold sequence."
-  [fold]
-  (rest (reverse fold)))
-
-(def f (typed/fn compiler
-                       [compiled :- Fold, transform :- Transform]
-                       (transform compiled)))
-
-(ann  compile-fold [CompleteFold -> Fold])
+(ann  compile-fold (All [[f :< AnyFold]]
+                        [[nil -> f] -> f]))
 (defn compile-fold
-  "Compiles a fold (a sequence of transforms, each represented as a function
-  taking the next transform) to a single map like
+  "Compiles a builder function by invoking it with `nil`, returning a fold map
+  like
 
   {:identity (fn [] ...),
    :reducer  (fn [acc x] ...)
    ...}"
-  [fold]
+  [builder]
   ; TODO: figure out how to have CompleteFold know the final element is a
   ; Terminal
   (assert-compiled-fold
-    ; Apply each transform to (terminal nil).
-    (reduce (typed/fn compiler
-              [compiled :- Fold, transform :- Transform]
-              (transform compiled))
-            ((terminal fold) nil)
-            (transforms fold))))
+    (builder nil)))
 
-(tc-ignore
-
+; TODO: what's the type of a Reducible?
+;       clojure.core.protocols/CollReduce?
+(ann  tesser (All [in out]
+                 [(Seqable (Seqable in))
+                  [nil -> (Fold in Any Any Any out)]
+                  -> out]))
 (defn tesser
   "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
   num-procs threads for the parallel (reducer) portion of the fold. Reducers
@@ -383,56 +386,63 @@
         ; Force seq realization so we can close filehandles
         (dorun seqs)))))
 
+(tc-ignore
+
 ; Defining transforms
 
 (defmacro deftransform*
   "We're trying to build functions that look like...
 
     (defn map
-      \"Takes a function `f` and an optional fold. Returns a version of the
-      fold which finally calls (f element) to transform each element.\"
+      \"Takes a function `f` and an optional fold builder. Returns a version of
+        the fold which finally calls (f element) to transform each element.\"
       ([f]
-       (map f []))
-      ([f fold]
-       (append fold
-               (fn build [{:keys [reducer] :as downstream}]
-                 (assoc downstream :reducer
-                        (fn reducer [acc input] (reducer acc (f input)))))))))
+       (map f nil))
+      ([f builder]
+        (letfn [(build [{:keys [reducer] :as downstream}]
+                  (assoc downstream :reducer
+                         (fn reducer [acc input] (reducer acc (f input)))))]
+          (if (nil? builder)
+            build
+            (comp builder build)))))
 
   Which involves a fair bit of shared boilerplate: the single-arity variant of
   the transform, the append/prepend logic, the annealing function and its
   destructuring bind, etc. We'll wrap these up in an anaphoric macro called
   `deftransform`, which takes a function (e.g. `append`) to conjoin this
-  transform with the fold. Within the body, `identity-`, `reducer-`,
-  `post-reducer-`, `combiner-`, `post-combiner-` are all bound to the
-  downstream transform's component functions, and `downstream` is bound to the
-  downstream transform itself."
+  transform with the fold.
+
+  Within the body, `identity-`, `reducer-`, `post-reducer-`, `combiner-`,
+  `post-combiner-` are all bound to the downstream transform's component
+  functions, and `downstream` is bound to the downstream transform itself."
   [conjoiner name docstring args & body]
   `(defn ~name ~docstring
      ; Version without fold argument
-     ([~@args] (~name ~@args []))
+     ([~@args] (~name ~@args nil))
      ; Version with fold argument
-     ([~@args fold#]
-      (~conjoiner fold#
-                  (fn build [~'downstream]
-                    (let ~'[identity-      (:identity downstream)
-                            reducer-       (:reducer downstream)
-                            post-reducer-  (:post-reducer downstream)
-                            combiner-      (:combiner downstream)
-                            post-combiner- (:post-combiner downstream)]
-                      ~@body))))))
+     ([~@args builder#]
+      (let [build# (fn build [~'downstream]
+                     (let ~'[identity-      (:identity downstream)
+                             reducer-       (:reducer downstream)
+                             post-reducer-  (:post-reducer downstream)
+                             combiner-      (:combiner downstream)
+                             post-combiner- (:post-combiner downstream)]
+                       ~@body))]
+        (if (nil? builder#)
+          build#
+          (~conjoiner builder# build#))))))
 
 (defmacro deftransform
   "Deftransform, assuming transforms should be appended to the end of the fold;
   e.g. innermost."
   [& args]
-  `(deftransform* append ~@args))
+  `(deftransform* comp ~@args))
 
 (defmacro defwraptransform
   "Like deftransform, but prepends the given transform to the beginning of the
   fold; e.g. outermost."
   [& args]
-  `(deftransform* prepend ~@args))
+  `(deftransform* rcomp ~@args))
 
 ;; General transformations
 

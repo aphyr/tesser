@@ -39,6 +39,14 @@
       (first xs)
       (recur a))))
 
+(defn rcomp
+  "Like comp, but arguments are backwards."
+  ([] (comp))
+  ([a] (comp a))
+  ([a b] (comp b a))
+  ([a b c] (comp c b a))
+  ([a b c & ds] (apply comp (reverse (cons a (cons b (cons c ds)))))))
+
 (defn map-vals
   "Maps over a key-value map, returning a new map by transforming each value
   with (f v)."
