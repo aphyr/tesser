@@ -224,14 +224,20 @@
 (defalias Fold
   "A compiled fold is a map of specific keys to functions for each part of the
   reduction process."
-  (All [reducer-input reducer-acc combiner-input combiner-acc result]
+  ; Do I really want contravariance here? The typechecker complains that
+  ; reducer-input is used in contravariant position, but I don't understand
+  ; what that means for functions. Should I drop reducer-input and say Any?
+  (TFn [[reducer-input  :variance :contravariant]
+        [reducer-acc    :variance :invariant]
+        [combiner-input :variance :invariant]
+        [combiner-acc   :variance :invariant]]
        (HMap :complete? true
              :mandatory
              {:identity      (IFn [-> (I reducer-acc combiner-acc)])
               :reducer       (IFn [reducer-acc reducer-input -> reducer-acc])
               :post-reducer  (IFn [reducer-acc -> combiner-input])
               :combiner      (IFn [combiner-acc combiner-input -> combiner-acc])
-              :post-combiner (IFn [combiner-acc -> result])})))
+              :post-combiner (IFn [combiner-acc -> Any])})))
 
 (defalias Terminal
   "A function that takes *no* downstream fold, returning a Fold from
