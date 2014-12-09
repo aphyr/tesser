@@ -4,11 +4,15 @@
             [clojure.test.check [clojure-test :refer :all]
                                 [generators :as gen]
                                 [properties :as prop]]
+            [clojure.core.typed :refer [check-ns]]
             [multiset.core :refer [multiset]]
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
-(def test-count 1e3)
+(def test-count 1e2)
+
+(deftest typecheck
+  (is (check-ns 'tesser.core)))
 
 (defn option
   "Generator that may return nil."

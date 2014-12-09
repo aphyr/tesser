@@ -34,7 +34,10 @@
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
                             not-every? replace group-by])
-  (:require [tesser.utils :refer :all]
+  (:require [clojure.core.typed :as typed
+             :refer [ann ann-form tc-ignore All U I HMap IFn Fn Any Seqable
+                     HSequential Nothing NonEmptySeqable defalias]]
+            [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
             [clojure.core.reducers :as r]
@@ -215,8 +218,42 @@
 ; *sequences* of transforms and return sequences of transforms. If no sequence
 ; is provides, they construct a new single-element sequence.
 
+
+;; Types
+
+(defalias Fold
+  "A compiled fold is a map of specific keys to functions for each part of the
+  reduction process."
+  (All [reducer-input reducer-acc combiner-input combiner-acc result]
+       (HMap :complete? true
+             :mandatory
+             {:identity      (IFn [-> (I reducer-acc combiner-acc)])
+              :reducer       (IFn [reducer-acc reducer-input -> reducer-acc])
+              :post-reducer  (IFn [reducer-acc -> combiner-input])
+              :combiner      (IFn [combiner-acc combiner-input -> combiner-acc])
+              :post-combiner (IFn [combiner-acc -> result])})))
+
+(defalias Terminal
+  "A function that takes *no* downstream fold, returning a Fold from
+  whole cloth."
+  [nil -> Fold])
+
+(defalias Transform
+  "A transform is a function that transforms a downstream Fold."
+  [Fold -> Fold])
+
+(defalias IncompleteFold
+  "A sequence of transforms without a Terminal."
+  (Seqable Transform))
+
+(defalias CompleteFold
+  "A sequence of transforms ending with a Terminal. I don't know how to enforce
+  this type."
+  (NonEmptySeqable (U Transform Terminal)))
+
 ;; Compiling and executing folds
 
+(ann  assert-compiled-fold [Fold -> Fold])
 (defn assert-compiled-fold
   "Is this a valid compiled fold?"
   [f]
@@ -229,6 +266,26 @@
           (str (pr-str f) " is missing a :post-combiner fn"))
   f)
 
+; These are no-check because core.typed can't type CompleteFold as
+; [Transform * Terminal], only (U Transform Terminal).
+(ann ^:no-check terminal [CompleteFold -> Terminal])
+(defn terminal
+  "The terminal fold generator from an uncompiled fold sequence."
+  [fold]
+  (assert (not-empty fold))
+  (last fold))
+
+(ann ^:no-check transforms [CompleteFold -> (Seqable Transform)])
+(defn transforms
+  "The transforms from an uncompiled fold sequence."
+  [fold]
+  (rest (reverse fold)))
+
+(def f (typed/fn compiler
+                       [compiled :- Fold, transform :- Transform]
+                       (transform compiled)))
+
+(ann  compile-fold [CompleteFold -> Fold])
 (defn compile-fold
   "Compiles a fold (a sequence of transforms, each represented as a function
   taking the next transform) to a single map like
@@ -237,11 +294,17 @@
    :reducer  (fn [acc x] ...)
    ...}"
   [fold]
-  (->> fold
-       reverse
-       (reduce (fn [compiled build] (build compiled))
-               nil)
-       assert-compiled-fold))
+  ; TODO: figure out how to have CompleteFold know the final element is a
+  ; Terminal
+  (assert-compiled-fold
+    ; Apply each transform to (terminal nil).
+    (reduce (typed/fn compiler
+              [compiled :- Fold, transform :- Transform]
+              (transform compiled))
+            ((terminal fold) nil)
+            (transforms fold))))
+
+(tc-ignore
 
 (defn tesser
   "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
@@ -864,3 +927,5 @@
        (fuse {:min (min)
               :max (max)})
        (post-combine (juxt :min :max))))
+
+)
