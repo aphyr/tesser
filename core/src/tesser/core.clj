@@ -34,7 +34,7 @@
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
                             not-every? replace group-by])
-  (:import (clojure.lang.Reduced))
+  (:import clojure.lang.Reduced)
   (:require [clojure.core.typed :as typed
              :refer [ann ann-form tc-ignore All U I HMap TFn IFn Fn Any Seqable
                      HSequential Nothing NonEmptySeqable defalias Option Promise inst]]
@@ -248,43 +248,6 @@
   contravariance works?"
   (Fold Nothing Any Any Any Any))
 
-; What is the type of (map float)?
-;
-; Two forms: (map float) and (map float builder)
-;
-; (map float) takes a fold which accepts floats and generalizes it to take any
-; number.
-;
-;   (All [a b c d]
-;     [(Fold Float a b c d) -> (Fold Num a b c d)])
-;
-; (map float (map parse-int))
-;
-; This fold takes Strings and maps them to Ints, then Floats, then passes em
-; downstream to something else. We're going to return a function of a Fold
-; which accepts Floats, and returns a Fold that accepts Strings.
-;
-; (All [a b c d]
-;   [(Fold Float a b c d) -> (Fold String a b c d)])
-;
-; So in (map float x), we're taking a [Num -> Float] and a [Fold -> Fold'] and
-; generating a function that takes a Fold accepting Floats and returns a Fold
-; accepting Nums.
-;
-; (All [in in' a b c d f]
-;   [[in -> in']
-;    [(Fold in a b c d) -> f]
-;    -> [(Fold in' a b c d) -> f]])
-;
-; The other type of composition we do goes to the *end*, like (postcombine).
-;
-; (postcombine str (sum)) gives a fold which gives the *string* version of a
-; sum.
-;
-; (All [out out']
-;   [[out -> out']
-;    [f -> (Fold a b c d out)]
-;    -> [f -> (Fold a b c d out')]])
 
 ;; Compiling and executing folds
 
@@ -410,8 +373,6 @@
         ; Force seq realization so we can close filehandles
         (dorun seqs)))))
 
-(tc-ignore
-
 ; Defining transforms
 
 (defmacro deftransform*
@@ -445,7 +406,7 @@
      ([~@args] (~name ~@args nil))
      ; Version with fold argument
      ([~@args builder#]
-      (let [build# (fn build [~'downstream]
+      (let [build# (fn ~'build [~'downstream]
                      (let ~'[identity-      (:identity downstream)
                              reducer-       (:reducer downstream)
                              post-reducer-  (:post-reducer downstream)
@@ -470,12 +431,78 @@
 
 ;; General transformations
 
+
+; What is the type of (map float)?
+;
+; Two forms: (map float) and (map float builder)
+;
+; (map float) returns a function that takes a fold which accepts floats and
+; generalizes it to take any number.
+;
+;   (All [a b c d]
+;     [in -> in']
+;     -> [(Fold in' a b c d) -> (Fold in a b c d)])
+;
+; (map float (map parse-int))
+;
+; This fold takes Strings and maps them to Ints, then Floats, then passes em
+; downstream to something else. We're going to return a function of a Fold
+; which accepts Floats, and returns a Fold that accepts Strings.
+;
+; (All [a b c d]
+;   [(Fold Float a b c d) -> (Fold String a b c d)])
+;
+; So in (map float x), we're taking a [Num -> Float] and a [Fold -> Fold'] and
+; generating a function that takes a Fold accepting Floats and returns a Fold
+; accepting Nums.
+;
+; (All [in in' a b c d f]
+;   [[in -> in']
+;    [(Fold in a b c d) -> f]
+;    -> [(Fold in' a b c d) -> f]])
+;
+; The other type of composition we do goes to the *end*, like (postcombine).
+;
+; (postcombine str (sum)) gives a fold which gives the *string* version of a
+; sum.
+;
+; (All [out out']
+;   [[out -> out']
+;    [f -> (Fold a b c d out)]
+;    -> [f -> (Fold a b c d out')]])
+
+(ann map (All [in in' in'' a b c d e f g h]
+              (IFn ; We have a function that maps in -> in', so we can
+                   ; lift a fold over in' to a fold over in.
+                   [[in' -> in'']
+                    -> [(Fold in'' a b c d) -> (Fold in' a b c d)]]
+
+                   ; Same thing if we get a nil builder
+                   [[in' -> in'']
+                    nil
+                    -> [(Fold in'' a b c d) -> (Fold in' a b c d)]]
+
+                   ; Consider
+                   ;
+                   ; (->> (map inc)
+                   ;      (map str) <-- here
+                   ;      (frequencies))
+                   ;
+                   ; The builder we're modifying emits records of type in', but
+                   ; our downstream fold consumes records of type in''. We use
+                   ; our function in' -> in'' to bridge the gap.
+                   [[in' -> in'']
+                    [(Fold in' a b c d) -> (Fold in e f g h)]
+                    -> [(Fold in'' a b c d) -> (Fold in e f g h)]])))
+
 (deftransform map
-  "Takes a function `f` and an optional fold. Returns a version of the fold
-  which finally calls (f input) to transform each element."
+  "Takes a function `f` and an optional fold builder. Returns a version of the
+  fold builder which finally calls (f input) to transform each element."
   [f]
-  (assoc downstream :reducer (fn reducer [acc x]
+  (assoc downstream :reducer (typed/fn reducer [acc x]
                                (reducer- acc (f x)))))
+
+(tc-ignore
 
 (defn replace
   "Given a map of replacement pairs, maps any inputs which are keys in the map

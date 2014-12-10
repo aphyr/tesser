@@ -4,15 +4,22 @@
             [clojure.test.check [clojure-test :refer :all]
                                 [generators :as gen]
                                 [properties :as prop]]
-            [clojure.core.typed :refer [check-ns]]
+            [clojure.core.typed :as T :refer [check-ns cf tc-ignore]]
             [multiset.core :refer [multiset]]
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
+;;
+
 (def test-count 1e2)
 
 (deftest typecheck
+  ; Someday
+  ; (is (check-ns 'tesser.core-test))
   (is (check-ns 'tesser.core)))
+
+;  (testing "single map"
+;    (is (cf (t/map float)))))
 
 (defn option
   "Generator that may return nil."
@@ -24,6 +31,7 @@
   sequences of sequences of inputs."
   [input-gen]
   (gen/vector (gen/vector input-gen) 0 5))
+
 
 (defn flatten1
   "Flattens a single level."
