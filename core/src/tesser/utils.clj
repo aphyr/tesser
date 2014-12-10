@@ -1,8 +1,15 @@
 (ns tesser.utils
   "Toolbox."
+  (:import clojure.lang.Reduced)
   (:require [clojure [set :as set]
                      [string :as str]
-                     [walk :as walk]]))
+                     [walk :as walk]]
+            [clojure.core.typed :as T]))
+
+; Core.typed overrides
+(T/override-method clojure.lang.RT/isReduced (T/Pred (Reduced T/Any)))
+
+(T/tc-ignore
 
 (defn prepend
   "Prepends a single value to the beginning of a sequence. O(1) for sequences
@@ -30,6 +37,12 @@
   ([m k f a b c]        (assoc m k (f (get m k) a b c)))
   ([m k f a b c & args] (assoc m k (apply f (get m k) a b c args))))
 
+  )
+
+(T/ann poll! (T/All [x] [(T/Atom2
+                           (T/Option (T/Seqable x))
+                           (T/Option (T/Seqable x)))
+                         -> (T/Option x)]))
 (defn poll!
   "Given an atom pointing to a sequence, pulls the first element off the
   sequence atomically and returns it."
@@ -38,6 +51,16 @@
     (if (compare-and-set! a xs (next xs))
       (first xs)
       (recur a))))
+
+(T/ann processors [-> Long])
+(defn processors
+  "How many processors does this platform have?"
+  []
+  (if-let [runtime (Runtime/getRuntime)]
+    (.availableProcessors runtime)
+    (throw (RuntimeException. "what runtime?"))))
+
+(T/tc-ignore
 
 (defn rcomp
   "Like comp, but arguments are backwards."
@@ -124,3 +147,5 @@
        (if (reduced? ~acc)
          (let [~acc (deref ~acc)] (reduced ~expr))
          ~expr))))
+
+)

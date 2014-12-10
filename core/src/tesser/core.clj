@@ -34,9 +34,11 @@
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
                             not-every? replace group-by])
+  (:import (clojure.lang.Reduced))
   (:require [clojure.core.typed :as typed
              :refer [ann ann-form tc-ignore All U I HMap TFn IFn Fn Any Seqable
-                     HSequential Nothing NonEmptySeqable defalias]]
+                     HSequential Nothing NonEmptySeqable defalias Option Promise inst]]
+            [clojure.core.typed.unsafe :as unsafe]
             [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
@@ -232,14 +234,19 @@
        (HMap :complete? true
              :mandatory
              {:identity      (IFn [-> (I reducer-acc combiner-acc)])
-              :reducer       (IFn [reducer-acc reducer-input -> reducer-acc])
+              :reducer       (IFn [reducer-acc reducer-input
+                                   -> (U reducer-acc
+                                         (Reduced reducer-acc))])
               :post-reducer  (IFn [reducer-acc -> combiner-input])
-              :combiner      (IFn [combiner-acc combiner-input -> combiner-acc])
+              :combiner      (IFn [combiner-acc combiner-input
+                                   -> (U combiner-acc
+                                         (Reduced combiner-acc))])
               :post-combiner (IFn [combiner-acc -> output])})))
 
 (defalias AnyFold
-  "A fold of any types."
-  (Fold Any Any Any Any Any))
+  "The most general kind of fold. Nothing seems weird, but I guess this is how
+  contravariance works?"
+  (Fold Nothing Any Any Any Any))
 
 ; What is the type of (map float)?
 ;
@@ -281,7 +288,8 @@
 
 ;; Compiling and executing folds
 
-(ann  assert-compiled-fold (All [[f :< AnyFold]] [f -> f]))
+(ann  assert-compiled-fold (All [a b c d e]
+                                [(Fold a b c d e) -> (Fold a b c d e)]))
 (defn assert-compiled-fold
   "Is this a valid compiled fold?"
   [f]
@@ -294,8 +302,8 @@
           (str (pr-str f) " is missing a :post-combiner fn"))
   f)
 
-(ann  compile-fold (All [[f :< AnyFold]]
-                        [[nil -> f] -> f]))
+(ann  compile-fold (All [a' b' c' d' e']
+                        [[nil -> (Fold a' b' c' d' e')] -> (Fold a' b' c' d' e')]))
 (defn compile-fold
   "Compiles a builder function by invoking it with `nil`, returning a fold map
   like
@@ -304,17 +312,18 @@
    :reducer  (fn [acc x] ...)
    ...}"
   [builder]
-  ; TODO: figure out how to have CompleteFold know the final element is a
-  ; Terminal
-  (assert-compiled-fold
-    (builder nil)))
+  ; the core.typed unifier can't see that assert-compiled-fold's free vars are
+  ; equivalent to our free vars
+  ((inst assert-compiled-fold a' b' c' d' e')
+   (builder nil)))
 
 ; TODO: what's the type of a Reducible?
 ;       clojure.core.protocols/CollReduce?
-(ann  tesser (All [in out]
-                 [(Seqable (Seqable in))
-                  [nil -> (Fold in Any Any Any out)]
+(ann  tesser (All [in reducer-acc combiner-input combiner-acc out]
+                 [(Option (Seqable (Seqable in)))
+                  [nil -> (Fold in Any combiner-input combiner-acc out)]
                   -> out]))
+
 (defn tesser
   "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
   num-procs threads for the parallel (reducer) portion of the fold. Reducers
@@ -323,13 +332,27 @@
   [seqs fold]
   (let [fold     (compile-fold fold)
         t0       (System/nanoTime)
-        threads  (.. Runtime getRuntime availableProcessors)
+        threads  (processors)
         queue    (atom seqs)
-        combiner (fn combiner [combined x]
-                   (if (reduced? combined)
-                     combined
-                     ((:combiner fold) combined x)))
-        combined (atom ((:identity fold)))
+        combined (typed/atom :- combiner-acc
+                             ((:identity fold)))
+        reduced-result  (ann-form (promise) (Promise combiner-acc))
+        combiner (typed/fn combiner [combined :- combiner-acc,
+                                     x        :- combiner-input]
+                   :- combiner-acc
+                   (let [combined' ((:combiner fold) combined x)]
+                     (if (reduced? combined')
+                       ; Early return via reduced
+                       (do
+                         ; I assert, unsafely, that combiner-acc is not itself
+                         ; allowed to be a Reduced. Dunno how to express
+                         ; this at the type level.
+                         (let [combined' (unsafe/ignore-with-unchecked-cast
+                                           combined' (Reduced combiner-acc))]
+                           (deliver reduced-result @combined')
+                           @combined'))
+                       ; Continue processing
+                       combined')))
         chunks   (atom 0)]
 ;        stats    (measure/periodically 1 (println @chunks "chunks processed"))]
     (try
@@ -355,7 +378,7 @@
 ;                                         (swap! chunks inc)
 
                                          ; Abort early if reduced.
-                                         (not (reduced? combined'))))))))))]
+                                         (not (realized? reduced-result))))))))))]
         (try
           ; Wait for workers
           (core/mapv deref workers)
@@ -363,9 +386,10 @@
           ; Stop printing stats
 ;          (stats)
 
-          (let [combined @combined
-                ; Unwrap reduced
-                combined (if (reduced? combined) @combined combined)
+          ; Extract result
+          (let [combined (if (realized? reduced-result)
+                           @reduced-result
+                           @combined)
 
                 ; Postcombine
                 result ((:post-combiner fold) combined)
