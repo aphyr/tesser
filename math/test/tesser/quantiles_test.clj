@@ -106,7 +106,8 @@
                                 (nil? point)
                                 (conj dist [cutoff total])
 
-                                (<= point cutoff)
+                                ; yay floating point
+                                (or (<= point cutoff) (=ish point cutoff))
                                 (recur cutoffs points' dist (inc total))
 
                                 true
@@ -122,9 +123,10 @@
   "Check that a quantile estimator handles a given set of inputs OK."
   [digest points]
   (fill! digest points)
+  (prn "-------------------------------------------------------------")
     (and (check-count digest points)
-         (check-quantiles digest points)))
-;         (check-distribution digest points)))
+         (check-quantiles digest points)
+         (check-distribution digest points)))
 
 (defn runs
   "Quickcheck likes to emit uniformly distributed vectors, but we need
@@ -147,12 +149,12 @@
 
 
 (defspec hdr-histogram-spec
-  1e4
+  1e3
   (prop/for-all [points (gen/vector gen/int)]
                 (check-digest (q/dual
                                 q/hdr-histogram
-                                {:highest-to-lowest-value-ratio 1e2
-                                 :significant-value-digits      3}) points)))
+                                {:highest-to-lowest-value-ratio 1e4
+                                 :significant-value-digits      4}) points)))
 
 (comment
 (defspec hdr-histogram-spec

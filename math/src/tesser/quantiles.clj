@@ -181,15 +181,21 @@
       ;     (cumulative-distribution neg)
 
       true
-      (let [neg-dist (cumulative-distribution neg)
-            offset   (point-count neg)]
-        (concat (->> neg-dist
-                     reverse
-                     (map (fn [[point total]]
-                            [(- point) total])))
+      (let [neg-dist    (cumulative-distribution neg)
+            pos-offset  (point-count neg)
+            neg-offset  (+ pos-offset (second (first neg-dist)))]
+        (prn :pos-offset pos-offset)
+        (prn :neg-offset neg-offset)
+        (prn :neg-dist neg-dist)
+        (concat (loop [[[point' total'] & remaining] neg-dist
+                       total 0
+                       dist  ()]
+                  (if (seq remaining)
+                    
+                    
                 (->> (cumulative-distribution pos)
                      (map (fn [[point total]]
-                            [point (+ total offset)])))))))
+                            [point (+ total pos-offset)])))))))
 
   Buffers
   (buf-capacity [this]
