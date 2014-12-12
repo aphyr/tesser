@@ -2,7 +2,8 @@
   "Toolbox."
   (:require [clojure [set :as set]
                      [string :as str]
-                     [walk :as walk]]))
+                     [walk :as walk]]
+            [clojure.core.reducers :as r]))
 
 (defn prepend
   "Prepends a single value to the beginning of a sequence. O(1) for sequences
@@ -19,6 +20,49 @@
   (if (vector? coll)
     (conj coll element)
     (concat coll (list element))))
+
+;; A mutable pair datatype, intended for use during singlethreaded reductions.
+(defprotocol Pair
+  (a [pair] "Returns the first element in the Pair.")
+  (b [pair] "Returns the second element in the Pair.")
+  (set-a! [pair a'] "Set the first element in the Pair.")
+  (set-b! [pair b'] "Set the second element in the Pair.")
+  (set-both! [pair a' b'] "Set both the first and second element in the pair."))
+
+(deftype UnsafePair [^:unsynchronized-mutable a ^:unsynchronized-mutable b]
+  Pair
+  (a [_] a)
+  (b [_] b)
+  (set-a! [this a'] (set! a a') this)
+  (set-b! [this b'] (set! b b') this)
+  (set-both! [this a' b']
+    (set! a a')
+    (set! b b')
+    this))
+
+(defn unsafe-pair
+  "Constructs a new unsynchronized pair object."
+  ([] (UnsafePair. nil nil))
+  ([a b] (UnsafePair. a b)))
+
+(defn differences
+  "A seq of the differences between successive elements in a collection.
+
+  (differences [1 2 4 5 2])
+  ; (1 2 1 -3)"
+  [coll]
+  (->> coll
+       (partition 2 1)
+       (map (fn [[x x']] (- x' x)))))
+
+(defn cumulative-sums
+  "A seq of the cumulative sums of all elements in coll, starting at init. The
+  integral to `differences` differential.
+
+  (cumulative-sums 1 [1 2 1 -3])
+  ; (1 2 4 5 2)"
+  [init coll]
+  (reductions + init coll))
 
 (defn update
   "Given a map, a key, a function f, and optional args, returns a copy of map
