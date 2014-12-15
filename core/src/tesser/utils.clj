@@ -48,21 +48,24 @@
 (defn differences
   "A seq of the differences between successive elements in a collection.
 
-  (differences [1 2 4 5 2])
-  ; (1 2 1 -3)"
+    (differences [1 2 4 5 2])
+    ; (1 2 1 -3)"
   [coll]
   (->> coll
        (partition 2 1)
        (map (fn [[x x']] (- x' x)))))
 
 (defn cumulative-sums
-  "A seq of the cumulative sums of all elements in coll, starting at init. The
-  integral to `differences` differential.
+  "A seq of the cumulative sums of all elements in `coll`, starting at `init`
+  or the first element of `coll` if `init` is not provided. The integral to
+  `differences` differential.
 
-  (cumulative-sums 1 [1 2 1 -3])
-  ; (1 2 4 5 2)"
-  [init coll]
-  (reductions + init coll))
+    (cumulative-sums 1 [1 2 1 -3])
+    ; (1 2 4 5 2)"
+  ([coll]
+   (reductions + coll))
+  ([init coll]
+   (reductions + init coll)))
 
 (defn update
   "Given a map, a key, a function f, and optional args, returns a copy of map

@@ -29,9 +29,7 @@
 
 (defprotocol CumulativeDistribution
   (cumulative-distribution [digest]
-                "STILL BROKEN, SO SORRY!
-
-                A non-normalized discrete cumulative distribution function for
+                "A non-normalized discrete cumulative distribution function for
                 a digest, represented as an ascending-order sequence of `[point
                 total]` pairs, where `total` is the number of points in the
                 digest which are less than or equal to `point`. `point` ranges
@@ -39,6 +37,20 @@
 
                 The cumulative distribution for an empty digest is an empty
                 seq."))
+
+(defn distribution
+  "A discrete distribution function for a digest, represented as an
+  ascending-order sequence of `[point count]` pairs, where `count` is the
+  number of points less than or equal to `point`, and greater than the previous
+  point. Point ranges from min to max inclusive."
+  [digest]
+  (let [cd (cumulative-distribution digest)]
+    (->> digest
+         cumulative-distribution
+         (cons [nil 0])
+         (partition 2 1)
+         (map (fn [[x c] [x' c']]
+                [x' (- c' c)])))))
 
 (defprotocol Buffers
   (buf-capacity [x] "How many bytes are we gonna need, tops?")
@@ -177,22 +189,24 @@
       (zero? (point-count neg))
       (cumulative-distribution pos)
 
-      ;     (zero? (point-count pos))
-      ;     (cumulative-distribution neg)
-
       true
       (let [neg-dist    (cumulative-distribution neg)
-            pos-offset  (point-count neg)
-            neg-offset  (+ pos-offset (second (first neg-dist)))]
-        (prn :pos-offset pos-offset)
-        (prn :neg-offset neg-offset)
-        (prn :neg-dist neg-dist)
-        (concat (loop [[[point' total'] & remaining] neg-dist
-                       total 0
-                       dist  ()]
-                  (if (seq remaining)
-                    
-                    
+            pos-offset  (point-count neg)]
+        ; Ugh, inefficient
+        (concat (map vector
+                     ; Points
+                     (->> neg-dist
+                          reverse
+                          (map first)
+                          (map -))
+                     ; Totals
+                     (->> neg-dist
+                          (map second)
+                          (cons 0)
+                          differences
+                          reverse
+                          cumulative-sums))
+                ; Positive distribution
                 (->> (cumulative-distribution pos)
                      (map (fn [[point total]]
                             [point (+ total pos-offset)])))))))
