@@ -8,7 +8,10 @@
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
-(def test-count 1e3)
+(def test-opts {:num-tests 1000
+                :par 256})
+
+(prn test-opts)
 
 (defn option
   "Generator that may return nil."
@@ -29,7 +32,7 @@
 ;; Tests
 
 (defspec map-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (->> (t/map inc)
                             (t/map (partial * 2))
@@ -42,7 +45,7 @@
                             (into (multiset)))))))
 
 (defspec replace-spec
-  1e3
+  test-opts
   (prop/for-all [chunks (chunks (option gen/boolean))]
                 (let [subs {true nil
                             nil false
@@ -56,7 +59,7 @@
                               (into (multiset))))))))
 
 (defspec mapcat-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (->> (t/mapcat range)
                             (t/filter even?)
@@ -69,7 +72,7 @@
                             (into (multiset)))))))
 
 (defspec keep-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (->> (t/keep #(when (even? %) (inc %)))
                             (t/into (multiset))
@@ -80,7 +83,7 @@
                             (into (multiset)))))))
 
 (defspec filter-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (->> (t/filter odd?)
                             (t/into (multiset))
@@ -91,7 +94,7 @@
                             (into (multiset)))))))
 
 (defspec remove-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (->> (t/remove odd?)
                             (t/into (multiset))
@@ -102,19 +105,19 @@
                             (into (multiset)))))))
 
 (defspec into-vec-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (sort (t/tesser chunks (t/into [])))
                        (sort (flatten1 chunks))))))
 
 (defspec into-set-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/into #{}))
                        (set (flatten1 chunks))))))
 
 (defspec take-spec
-  test-count
+  test-opts
   ; Our chunks will be random partitionings of the integers, and we'll take
   ; them into a vector, then verify it contains n unique elements.
   (prop/for-all [n     gen/pos-int
@@ -143,7 +146,7 @@
                                 (count (set x)))))))))
 
 (defspec take-take-spec
-  test-count
+  test-opts
   ; Our chunks will be random partitionings of the integers, and we'll take
   ; them into a vector, then verify it contains n unique elements. Performing
   ; two takes verifies that the reduced optimizations compose well. :)
@@ -174,7 +177,7 @@
                                 (count (set x)))))))))
 
 (defspec post-combine-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (->> (t/map inc)
                             (t/map str)
@@ -192,7 +195,7 @@
 ;; Splitting folds
 
 (defspec group-by-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (let [g #(mod % 3)]
                   (is (= (->> (t/group-by g)
@@ -204,7 +207,7 @@
                               (into {})))))))
 
 (defspec facet-spec
-  test-count
+  test-opts
   ; Sum over maps of keywords to ints
   (prop/for-all [chunks (chunks
                           (gen/resize 4 (gen/map (gen/elements [:a :b :c :d :e])
@@ -217,7 +220,7 @@
                             (apply merge-with min {}))))))
 
 (defspec fuse-spec
-  test-count
+  test-opts
   ; sum, set, and multiset over ints
   (prop/for-all [chunks (chunks gen/int)]
                 (let [inputs (flatten1 chunks)]
@@ -233,31 +236,31 @@
 ;; Basic reductions
 
 (defspec count-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/count))
                        (count (flatten1 chunks))))))
 
 (defspec set-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/set))
                        (set (flatten1 chunks))))))
 
 (defspec frequencies-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/frequencies))
                        (frequencies (flatten1 chunks))))))
 
 (defspec some-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/some #{1}))
                        (some #{1} (flatten1 chunks))))))
 
 (defspec any-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (let [e           (t/tesser chunks (t/any))
                       candidates  (set (flatten1 chunks))]
@@ -266,19 +269,19 @@
 
 ;; Predicate folds
 (defspec empty?-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks (option gen/boolean))]
                 (is (= (t/tesser chunks (t/empty?))
                        (empty? (flatten1 chunks))))))
 
 (defspec every?-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/every? odd?))
                        (every? odd? (flatten1 chunks))))))
 
 (defspec not-every?-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (t/not-every? odd?))
                        (not-every? odd? (flatten1 chunks))))))
@@ -286,7 +289,7 @@
 ;; Comparable folds
 
 (defspec max-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (let [m (t/tesser chunks (t/max))]
                   (if (every? empty? chunks)
@@ -294,7 +297,7 @@
                     (= m (reduce max (flatten1 chunks)))))))
 
 (defspec min-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (let [m (t/tesser chunks (t/min))]
                   (if (every? empty? chunks)
@@ -302,7 +305,7 @@
                     (= m (reduce min (flatten1 chunks)))))))
 
 (defspec range-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (let [inputs (flatten1 chunks)]
                   (= (t/tesser chunks (t/range))

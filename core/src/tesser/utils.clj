@@ -45,6 +45,16 @@
   ([] (UnsafePair. nil nil))
   ([a b] (UnsafePair. a b)))
 
+(defn successive-pairs
+  "A much faster version of (partition 2 1 coll) which generates vectors, not
+  lazy seqs."
+  ([coll] (successive-pairs (first coll) (next coll)))
+  ([prev coll]
+   (lazy-seq
+     (when-let [s (seq coll)]
+       (let [x (first s)]
+         (cons [prev x] (successive-pairs x (next coll))))))))
+
 (defn differences
   "A seq of the differences between successive elements in a collection.
 
@@ -52,7 +62,7 @@
     ; (1 2 1 -3)"
   [coll]
   (->> coll
-       (partition 2 1)
+       successive-pairs
        (map (fn [[x x']] (- x' x)))))
 
 (defn cumulative-sums

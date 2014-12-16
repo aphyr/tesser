@@ -7,10 +7,11 @@
             [multiset.core :refer [multiset]]
             [tesser.utils :refer :all]))
 
-(def test-count 1e3)
+(def test-opts {:num-tests 1000
+                :par 256})
 
 (defspec differences-spec
-  test-count
+  test-opts
   (prop/for-all [coll (gen/such-that not-empty (gen/vector gen/int))]
                 (is (= coll
                        (->> coll
