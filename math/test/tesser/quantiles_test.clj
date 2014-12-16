@@ -6,10 +6,13 @@
             [clojure.test.check [clojure-test :refer :all]
                                 [generators :as gen]
                                 [properties :as prop]]
-            [tesser.math-test :refer [correlation =ish bigger-ints]]
+            [tesser.math-test :refer [correlation approx= =ish bigger-ints]]
             [tesser.quantiles :as q]))
 
-(def test-count 1e2)
+; For larger values we start failing the distribution analysis due to
+; floating-point offset errors. Ughhh.
+(def test-opts {:num-tests 1000
+                :par 48})
 
 (defn fill!
   "Applies all points to a given digest."
@@ -84,46 +87,98 @@
         (or (check-quantiles-exact qc)
             (and (check-quantiles-correlation qc)))))))
 
+(defn equiv-distributions
+  "Floating point is a problem.
+
+  test.check is really good at finding inputs like
+
+  :points (-1.05 -0.89 -0.45 0.73 0.73 1.98)
+  :digest ([-1.05003 1] [-0.88999 1] [-0.44999 1] [0.72998 2] [1.98001 1])
+  :actual [[-1.05003 0] [-0.88999 2] [-0.44999 1] [0.72998 0] [1.98001 3]]
+
+  Note that 0.73 has been represented in the digest as 0.72998, which pushed
+  both 0.73's up into the next bucket: 1.98001.
+
+  So, to verify distribution equivalence, we check:
+
+  1. Every point is identical.
+  2. If we ever see a count that is not equal, we can make it up by stealing
+     from the next bucket.
+
+  dist1 is the digest, dist2 is the actual."
+  [dist1 dist2]
+  (and (testing "points"
+         (is (= (map first dist1) (map first dist2))))
+       (testing "counts"
+         (let [c1    (map second dist1)
+               c2    (map second dist2)]
+           (loop [[p1 & c1' :as c1] (map second dist1)
+                  [p2 & c2' :as c2] (map second dist2)]
+             (if (nil? p1)
+               ; Done
+               true
+
+               (if (= p1 p2)
+                 ; Good.
+                 (recur c1' c2')
+
+                 (let [p1' (first c1')
+                       p2' (first c2')
+                       delta (- p1 p2)]
+;                   (prn :p1 p1 :p2 p2 :delta delta)
+                   (if-not (and p1' p2')
+                     ; We're at the end, too bad.
+                     false
+
+                     ; Can we find (= p1 p2) by rebalancing p2 and p2',
+                     ; keeping both positive?
+                     (let [p2-new  (+ p2 delta)
+                           p2'-new (- p2' delta)]
+;                       (prn :p2-new p2-new :p2'-new p2'-new)
+                       (if (or (neg? p2-new) (neg? p2'-new))
+                         ; Can't rebalance enough
+                         false
+
+                         ; Try again with the new balance.
+                         (recur c1 (cons p2-new (cons p2'-new (next c2')))))))))))))))
+
+
 (defn check-distribution
-  "Verifies that the cumulative distribution over the digest matches the
-  points."
+  "Verifies that the distribution over the digest matches the points."
   [digest points]
-  (testing "cumulative distribution"
+  (testing "distribution"
     (if (empty? points)
-      (is (= [] (q/cumulative-distribution digest)))
+      (is (= [] (q/distribution digest)))
 
-      (let [digest-dist (q/cumulative-distribution digest)
+      (let [digest-dist (q/distribution digest)
             cutoffs     (map first digest-dist)
-            real-dist   (loop [[cutoff & cutoffs' :as cutoffs] cutoffs
-                               [point  & points'  :as points]  (sort points)
-                               dist                               []
-                               total                              0]
-                          (cond ; Stretch the cutoff to the next point
-                                (nil? cutoff)
-                                (recur [point] points dist total)
-
-                                ; Done!
+            points      (sort points)
+            real-dist   (loop [[cutoff & cutoffs' :as cutoffs]  cutoffs
+                               [point & points'   :as points]   points
+                               dist                             []
+                               n                                0]
+                          (cond ; Done!
                                 (nil? point)
-                                (conj dist [cutoff total])
+                                (conj dist [cutoff n])
 
-                                ; yay floating point
-                                (or (<= point cutoff) (=ish point cutoff))
-                                (recur cutoffs points' dist (inc total))
+                                (or (empty? cutoffs') (<= point cutoff))
+                                (recur cutoffs points' dist (inc n))
 
                                 true
                                 (recur cutoffs' points
-                                       (conj dist [cutoff total])
-                                       total)))]
-        (or (is (= digest-dist real-dist))
-            (prn :points points)
-            (prn :digest digest-dist)
-            (prn :actual real-dist))))))
+                                       (conj dist [cutoff n])
+                                       0)))]
+        (and (is (=ish (first points) (first cutoffs)))
+             (is (=ish (last points)  (last cutoffs)))
+             (or (is (equiv-distributions digest-dist real-dist))
+                 (prn :points points)
+                 (prn :digest digest-dist)
+                 (prn :actual real-dist)))))))
 
 (defn check-digest
   "Check that a quantile estimator handles a given set of inputs OK."
   [digest points]
   (fill! digest points)
-  (prn "-------------------------------------------------------------")
     (and (check-count digest points)
          (check-quantiles digest points)
          (check-distribution digest points)))
@@ -147,28 +202,20 @@
   [x]
   (double (/ x 100)))
 
-
 (defspec hdr-histogram-spec
-  1e3
-  (prop/for-all [points (gen/vector gen/int)]
+  test-opts
+  (prop/for-all [points (gen/vector (gen/fmap smaller bigger-ints))]
+                ;(prn :points points)
                 (check-digest (q/dual
                                 q/hdr-histogram
-                                {:highest-to-lowest-value-ratio 1e4
+                                {:highest-to-lowest-value-ratio 1e6
                                  :significant-value-digits      4}) points)))
 
-(comment
-(defspec hdr-histogram-spec
-  1e4
-  (prop/for-all [points (gen/vector (gen/fmap smaller bigger-ints))]
-                (check-digest (q/dual
-                                q/hdr-histogram
-                                {:highest-to-lowest-value-ratio 1e8
-                                 :significant-value-digits      3}) points)))
-
 (defspec hdr-histogram-runs-spec
-  1e2
+  (assoc test-opts :num-tests 20)
   (prop/for-all [points (runs (gen/fmap smaller bigger-ints))]
+                ;(prn :points points)
                 (check-digest (q/dual
                                 q/hdr-histogram
-                                {:highest-to-lowest-value-ratio 1e8
-                                 :significant-value-digits      3}) points))))
+                                {:highest-to-lowest-value-ratio 1e6
+                                 :significant-value-digits      4}) points)))
