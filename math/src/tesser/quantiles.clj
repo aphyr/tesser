@@ -15,10 +15,11 @@
 
 (defprotocol Digest
   (add-point! [digest x]
-              "Add a value to the given digest, mutating the digest.")
+              "Add a value to the given digest, mutating the digest. Returns
+              digest.")
   (merge-digest! [digest other]
                  "Merges the second digest into the first, mutating the
-                 first.")
+                 first. Returns the first digest.")
   (point-count [digest]
                "How many points went into this digest?"))
 
@@ -92,8 +93,8 @@
 
 (extend-type DoubleHistogram
   Digest
-  (add-point!       [digest x] (.recordValue digest x))
-  (merge-digest!    [digest ^DoubleHistogram d] (.add digest d))
+  (add-point!       [digest x] (.recordValue digest x) digest)
+  (merge-digest!    [digest ^DoubleHistogram d] (.add digest d) digest)
   (point-count      [digest]   (.getTotalCount digest))
 
   Quantile
