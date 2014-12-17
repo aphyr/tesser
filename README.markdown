@@ -71,6 +71,8 @@ Fold combinators like
 [fuse](http://aphyr.github.io/tesser/tesser.core.html#var-fuse) allow multiple
 reductions to be done in a single pass, possibly sharing expensive operations
 like deserialization. This is a particularly effective way of working with a
+  (:import (com.clearspring.analytics.stream.quantile QDigest)
+           (com.tdunning.math.stats AVLTreeDigest))
 set of data files on disk or in Hadoop.
 
 Given JSON records about a codebase like
@@ -106,7 +108,7 @@ Ready to get started? Start with the [tesser.core docs](http://aphyr.github.io/t
 
 [Tesser.math](http://aphyr.github.io/tesser/tesser.math.html) provides
 statistical folds. Some, like sum, mean, and correlation, are exact. Others,
-like quantiles, are estimates. Quantiles and histograms are still a WIP.
+like quantiles, are estimates.
 
 For instance, to find a Pearson correlation matrix between ln(age), height, and
 weight; and in the same pass, to find the total number of samples:
