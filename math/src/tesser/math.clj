@@ -2,8 +2,6 @@
   "Folds over numbers! Calculate sums, means, variance, standard deviation,
   covariance and linear correlations, and matrices thereof, plus quantiles and
   histograms estimates backed by probabilistic QDigests."
-  (:import (com.clearspring.analytics.stream.quantile QDigest)
-           (com.tdunning.math.stats AVLTreeDigest))
   (:require [tesser.core :as t :refer [deftransform]]
             [tesser.utils :refer :all]
             [tesser.quantiles :as q]
