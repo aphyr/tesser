@@ -101,7 +101,6 @@
 
   1. A function like `covariance` that takes two functions of an input and
      yields a fold, and
-
   2. A map of key names to functions that extract values for
      those keys from an input,
 
@@ -135,16 +134,15 @@
   from an input, computes the covariance for each of the n^2 key pairs,
   returning a map of name pairs to the their covariance. For example:
 
-  (t/covariance-matrix {:name-length #(.length (:name %))
-                        :age         :age
-                        :num-cats    (comp count :cats)})"
+      (t/covariance-matrix {:name-length #(.length (:name %))
+                            :age         :age
+                            :num-cats    (comp count :cats)})"
   [& args]
   (apply fuse-matrix covariance args))(defn fuse-matrix
   "Given:
 
   1. A function like `covariance` that takes two functions of an input and
      yields a fold, and
-
   2. A map of key names to functions that extract values for
      those keys from an input,
 
@@ -178,9 +176,9 @@
   from an input, computes the covariance for each of the n^2 key pairs,
   returning a map of name pairs to the their covariance. For example:
 
-  (t/covariance-matrix {:name-length #(.length (:name %))
-                        :age         :age
-                        :num-cats    (comp count :cats)})"
+      (t/covariance-matrix {:name-length #(.length (:name %))
+                            :age         :age
+                            :num-cats    (comp count :cats)})"
   [& args]
   (apply fuse-matrix covariance args))
 
@@ -193,7 +191,7 @@
 
   This function returns a map of correlation and count, like
 
-  {:correlation 0.34 :count 142}
+      {:correlation 0.34 :count 142}
 
   which is useful for significance testing."
   [fx fy]
@@ -236,15 +234,15 @@
   pairs, returning a map of name pairs to the their correlations and counts.
   See correlation+count. For example:
 
-  (t/correlation-matrix {:name-length #(.length (:name %))
-                        :age         :age
-                        :num-cats    (comp count :cats)})
+      (t/correlation-matrix {:name-length #(.length (:name %))
+                            :age         :age
+                            :num-cats    (comp count :cats)})
 
   will, when executed, returns a map like
 
-  {[:name-length :age]      {:count 150 :correlation 0.56}
-   [:name-length :num-cats] {:count 150 :correlation 0.95}
-   ...}"
+      {[:name-length :age]      {:count 150 :correlation 0.56}
+       [:name-length :num-cats] {:count 150 :correlation 0.95}
+       ...}"
   [& args]
   (apply fuse-matrix correlation+count args))
 
@@ -274,55 +272,55 @@
 
   Compute a digest using e.g.
 
-    (def digest (->> (m/digest q/hdr-histogram)
-                     (t/tesser [[1 1 1 1 1 1 2 2 2 3 3 4 5]])))
-    ; => #<DoubleHistogram ...>
+      (def digest (->> (m/digest q/hdr-histogram)
+                       (t/tesser [[1 1 1 1 1 1 2 2 2 3 3 4 5]])))
+      ; => #<DoubleHistogram ...>
 
   To specify options for the digest, just use partial or (fn [] ...)
 
-    (m/digest (partial q/hdr-histogram {:significant-value-digits 4
-                                        :highest-to-lowest-value-ratio 1e6}))
+      (m/digest (partial q/hdr-histogram {:significant-value-digits 4
+                                          :highest-to-lowest-value-ratio 1e6}))
 
   DoubleHistogram, like many quantile estimators, only works over positive
   values. To cover positives and negatives together, use
   `tesser.quantiles/dual`:
 
-    (m/digest #(q/dual q/hdr-histogram {:significant-value-digits 2}))
+      (m/digest #(q/dual q/hdr-histogram {:significant-value-digits 2}))
 
   Once you've computed a digest, you can find a particular quantile using
   `tesser.quantiles/quantile`
 
-    (q/quantile digest 0)   ; => 1.0
-    (q/quantile digest 0.5) ; => 1.0
-    (q/quantile digest 4/5) ; => 2.0009765625
-    (q/quantile digest 1)   ; => 3.0009765625
+      (q/quantile digest 0)   ; => 1.0
+      (q/quantile digest 0.5) ; => 1.0
+      (q/quantile digest 4/5) ; => 2.0009765625
+      (q/quantile digest 1)   ; => 3.0009765625
 
   The total number of points in the sample:
 
-    (q/point-count digest) ; => 5
+      (q/point-count digest) ; => 5
 
   Minima and maxima:
 
-    (q/min digest) ; => 1.0
-    (q/max digest) ; => 3.0009765625
+      (q/min digest) ; => 1.0
+      (q/max digest) ; => 3.0009765625
 
   Or find the distribution of values less than or equal to each point, with
   resolution given by the internal granularity of the digest:
 
-    (q/distribution digest)
-    ; => ([1.0 3] [2.0009765625 1] [3.0009765625 1])
+      (q/distribution digest)
+      ; => ([1.0 3] [2.0009765625 1] [3.0009765625 1])
 
-    (q/cumulative-distribution digest)
-    ; => ([1.0 3] [2.0009765625 4] [3.0009765625 5])
+      (q/cumulative-distribution digest)
+      ; => ([1.0 3] [2.0009765625 4] [3.0009765625 5])
 
   You don't have to return the whole digest; any of these derivative
   operations can be merged directly into the fold via
   `tesser.core/post-combine`.
 
-    (->> (m/digest q/hdr-histogram)
-         (t/post-combine #(q/quantile % 1/2))
-         (t/tesser [[1 2 2 3 3 3 3 3 3 3 3]]))
-    ; => 3.0009765625
+      (->> (m/digest q/hdr-histogram)
+           (t/post-combine #(q/quantile % 1/2))
+           (t/tesser [[1 2 2 3 3 3 3 3 3 3 3]]))
+      ; => 3.0009765625
 
   I want to emphasize that depending on the size of your data, its
   distribution, and the number of digests you want to compute, you may need
