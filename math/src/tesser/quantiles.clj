@@ -49,8 +49,8 @@
     (->> digest
          cumulative-distribution
          (cons [nil 0])
-         (partition 2 1)
-         (map (fn [[x c] [x' c']]
+         successive-pairs
+         (map (fn [[[x c] [x' c']]]
                 [x' (- c' c)])))))
 
 (defprotocol Buffers

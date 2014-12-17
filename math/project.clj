@@ -13,4 +13,4 @@
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
                                   [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
                                   [criterium "0.4.3"]
-                                  [org.clojure/test.check "0.5.9"]]}})
+                                  [org.clojure/test.check "0.6.2-SNAPSHOT"]]}})
