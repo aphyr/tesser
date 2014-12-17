@@ -6,6 +6,7 @@
            (com.tdunning.math.stats AVLTreeDigest))
   (:require [tesser.core :as t :refer [deftransform]]
             [tesser.utils :refer :all]
+            [tesser.quantiles :as q]
             [clojure.core.reducers :as r]
             [clojure.math.numeric-tower :refer :all]
             [clojure.math.combinatorics :as combo]
@@ -261,3 +262,79 @@
   instead of maps of :correlation and :count."
   [& args]
   (apply fuse-matrix correlation args))
+
+(deftransform digest
+  "You've got a set of numeric inputs and want to know their quantiles
+  distribution, histogram, etc. This fold takes numeric inputs and
+  produces a statistical estimate of their distribution.
+
+  `digest` takes a function that returns a `tesser.quantiles/Digest`. The fold
+  returns an instance of that digest.
+
+  For example, to compute an HDRHistogram over both positive and negative
+  doubles (or longs, rationals, etc):
+
+  Compute a digest using e.g.
+
+    (def digest (->> (m/digest q/hdr-histogram)
+                     (t/tesser [[1 1 1 1 1 1 2 2 2 3 3 4 5]])))
+    ; => #<DoubleHistogram ...>
+
+  To specify options for the digest, just use partial or (fn [] ...)
+
+    (m/digest (partial q/hdr-histogram {:significant-value-digits 4
+                                        :highest-to-lowest-value-ratio 1e6}))
+
+  DoubleHistogram, like many quantile estimators, only works over positive
+  values. To cover positives and negatives together, use
+  `tesser.quantiles/dual`:
+
+    (m/digest #(q/dual q/hdr-histogram {:significant-value-digits 2}))
+
+  Once you've computed a digest, you can find a particular quantile using
+  `tesser.quantiles/quantile`
+
+    (q/quantile digest 0)   ; => 1.0
+    (q/quantile digest 0.5) ; => 1.0
+    (q/quantile digest 4/5) ; => 2.0009765625
+    (q/quantile digest 1)   ; => 3.0009765625
+
+  The total number of points in the sample:
+
+    (q/point-count digest) ; => 5
+
+  Minima and maxima:
+
+    (q/min digest) ; => 1.0
+    (q/max digest) ; => 3.0009765625
+
+  Or find the distribution of values less than or equal to each point, with
+  resolution given by the internal granularity of the digest:
+
+    (q/distribution digest)
+    ; => ([1.0 3] [2.0009765625 1] [3.0009765625 1])
+
+    (q/cumulative-distribution digest)
+    ; => ([1.0 3] [2.0009765625 4] [3.0009765625 5])
+
+  You don't have to return the whole digest; any of these derivative
+  operations can be merged directly into the fold via
+  `tesser.core/post-combine`.
+
+    (->> (m/digest q/hdr-histogram)
+         (t/post-combine #(q/quantile % 1/2))
+         (t/tesser [[1 2 2 3 3 3 3 3 3 3 3]]))
+    ; => 3.0009765625
+
+  I want to emphasize that depending on the size of your data, its
+  distribution, and the number of digests you want to compute, you may need
+  different digest algorithms and widely varying tuning parameters. Until we
+  have a better grasp of the space/error tradeoffs here, I won't choose
+  defaults for you."
+  [digest-generator]
+  (assert (nil? downstream))
+  {:identity      digest-generator
+   :reducer       q/add-point!
+   :post-reducer  identity
+   :combiner      q/merge-digest!
+   :post-combiner identity})

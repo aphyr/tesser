@@ -7,10 +7,12 @@
                                 [properties :as prop]]
             [multiset.core :refer [multiset]]
             [tesser.utils :refer :all]
-            [tesser.core :as t]
-            [tesser.math :as m]))
+            [tesser [core :as t]
+                    [math :as m]
+                    [quantiles :as q]]))
 
-(def test-count 1e2)
+(def test-opts {:num-tests 100
+                :par       4})
 
 (deftest map-sum-test
   (is (= (->> (t/map inc)
@@ -19,12 +21,18 @@
          27)))
 
 ;; Utility functions
+(defn smaller
+    "Make numbers smaller"
+    [x]
+    (double (/ x 100)))
+
 (defn approx=
   "Equal to within err fraction, or if one is zero, to within err absolute."
   ([err x y]
-   (if (or (zero? x) (zero? y))
-     (< (- err) (- x y) err)
-     (< (- 1 err) (/ x y) (+ 1 err))))
+   (or (= x y)
+       (if (or (zero? x) (zero? y))
+         (< (- err) (- x y) err)
+         (< (- 1 err) (/ x y) (+ 1 err)))))
   ([err x y & more]
    (->> more
         (cons y)
@@ -51,7 +59,7 @@
 ;; Numeric folds
 
 (defspec sum-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (t/tesser chunks (m/sum))
                         (reduce + 0 (flatten1 chunks))))))
@@ -62,7 +70,7 @@
   (/ (reduce + coll) (count coll)))
 
 (defspec mean-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (gen/such-that (partial some not-empty)
                                        (chunks gen/int))]
                 (is (== (t/tesser chunks (m/mean))
@@ -76,14 +84,14 @@
      (max (dec (count coll)) 1)))
 
 (defspec variance-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (gen/such-that (partial some not-empty)
                                        (chunks gen/int))]
                 (=ish (t/tesser chunks (m/variance))
                       (variance (flatten1 chunks)))))
 
 (defspec standard-deviation-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (gen/such-that (partial some not-empty)
                                        (chunks gen/int))]
                 (=ish (t/tesser chunks (m/standard-deviation))
@@ -102,7 +110,7 @@
                    (count coll)))))))
 
 (defspec covariance-spec
-  test-count
+  test-opts
   ; Take maps like {}, {:x 1}, {:x 2 :y 3} and compute covariance
   (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y]) gen/int))]
                 (is (= (->> (m/covariance :x :y)
@@ -110,7 +118,7 @@
                        (covariance :x :y (flatten1 chunks))))))
 
 (defspec covariance-matrix-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y :z]) gen/int))]
                 (let [inputs (flatten1 chunks)]
                   (is (= (->> (m/covariance-matrix {"x" :x "y" :y "z" :z})
@@ -146,14 +154,14 @@
             nil))))))
 
 (defspec correlation-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y]) gen/int))]
                 (is (= (->> (m/correlation :x :y)
                             (t/tesser chunks))
                        (correlation :x :y (flatten1 chunks))))))
 
 (defspec correlation-matrix-spec
-  test-count
+  test-opts
   (prop/for-all [chunks (chunks (gen/map (gen/elements [:x :y :z]) gen/int))]
                 (let [inputs (flatten1 chunks)]
                   (is (= (->> (m/correlation-matrix {"x" :x "y" :y "z" :z})
@@ -168,63 +176,15 @@
                             ["z" "x"] xz
                             ["z" "y"] yz}))))))
 
-(comment
-(defspec t-digest-test
-  1e3
-  (prop/for-all [chunks
-                 (->> (chunks gen/int)
-                      (gen/such-that (partial some not-empty))
-                      (gen/fmap (partial map (partial map #(double (/ % 3))))))]
-                (let [inputs (sort (flatten1 chunks))
-                      n      (count inputs)
-                      digest (t/tesser chunks (m/t-digest {}))]
-                  (if (= n 1)
-                    ; Special case: only one input
-                    (= (first inputs)
-                       (m/quantile digest 0)
-                       (m/quantile digest 1/3)
-                       (m/quantile digest 1/2)
-                       (m/quantile digest 2/3)
-                       (m/quantile digest 1))
-                    ; General case: lots of inputs
-                    (->> inputs
-                         (map-indexed (fn [i x]
-                                        (let [q (/ i (dec n))]
-                                          (or (<= (- x 1e-10)
-                                                  (.quantile digest q)
-                                                  (nth inputs (min (inc i)
-                                                                   (dec n))))
-                                              (prn :i i :q q :x x :actual
-                                                   (m/quantile digest q))))))
-                         (every? true?)))))))
-
-
-(comment
-(defspec t-digest-test
-  1e3
-  (prop/for-all [chunks
-                 (->> (chunks gen/int)
-                      (gen/such-that (partial some not-empty))
-                      (gen/fmap (partial map (partial map #(double (/ % 3))))))]
-                (let [inputs (sort (flatten1 chunks))
-                      n      (count inputs)
-                      digest (t/tesser chunks (m/t-digest {}))]
-                  (if (= n 1)
-                    ; Special case: only one input
-                    (= (first inputs)
-                       (m/quantile digest 0)
-                       (m/quantile digest 1/3)
-                       (m/quantile digest 1/2)
-                       (m/quantile digest 2/3)
-                       (m/quantile digest 1))
-                    ; General case: lots of inputs
-                    (->> inputs
-                         (map-indexed (fn [i x]
-                                        (let [q (/ i (dec n))]
-                                          (or (<= (- x 1e-10)
-                                                  (.quantile digest q)
-                                                  (nth inputs (min (inc i)
-                                                                   (dec n))))
-                                              (prn :i i :q q :x x :actual
-                                                   (m/quantile digest q))))))
-                         (every? true?)))))))
+(defspec digest-spec
+  test-opts
+  (prop/for-all [chunks (chunks (gen/fmap smaller gen/int))]
+                (let [inputs  (flatten1 chunks)
+                      digest  (->> (m/digest #(q/dual q/hdr-histogram))
+                                   (t/tesser chunks))]
+                  (and (is (=ish (q/min digest)
+                                 (when (seq inputs) (reduce min inputs))))
+                       (is (=ish (q/max digest)
+                                 (when (seq inputs) (reduce max inputs))))
+                       (is (= (q/point-count digest)
+                              (count inputs)))))))

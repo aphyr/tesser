@@ -24,8 +24,10 @@
                "How many points went into this digest?"))
 
 (defprotocol Quantile
-  (min       [digest] "The minimum point in the digest.")
-  (max       [digest] "The maximum point in the digest.")
+  (min       [digest] "The minimum point in the digest. For empty digests,
+                      nil.")
+  (max       [digest] "The maximum point in the digest. For empty digests,
+                      nil.")
   (quantile  [digest q]  "Returns a point near the given quantile."))
 
 (defprotocol CumulativeDistribution
@@ -98,8 +100,10 @@
   (point-count      [digest]   (.getTotalCount digest))
 
   Quantile
-  (min      [digest]   (.getMinValue digest))
-  (max      [digest]   (.getMaxValue digest))
+  (min      [digest]   (when-not (zero? (point-count digest))
+                         (.getMinValue digest)))
+  (max      [digest]   (when-not (zero? (point-count digest))
+                         (.getMaxValue digest)))
   (quantile [digest q] (.getValueAtPercentile digest (* q 100)))
 
   CumulativeDistribution
@@ -153,6 +157,14 @@
        (point-count pos)))
 
   Quantile
+  (min [this] (if-let [x (max neg)]
+                (- x)
+                (min pos)))
+
+  (max [this] (or (max pos)
+                  (when-let [x (min neg)]
+                    (- x))))
+
   (quantile [this q]
     (let [n (point-count neg)
           p (point-count pos)

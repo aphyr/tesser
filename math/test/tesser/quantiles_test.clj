@@ -6,7 +6,8 @@
             [clojure.test.check [clojure-test :refer :all]
                                 [generators :as gen]
                                 [properties :as prop]]
-            [tesser.math-test :refer [correlation approx= =ish bigger-ints]]
+            [tesser.math-test :refer [correlation approx= =ish bigger-ints
+                                      smaller]]
             [tesser.quantiles :as q]))
 
 ; For larger values we start failing the distribution analysis due to
@@ -196,11 +197,6 @@
                         (fn [values]
                           (gen/return
                             (mapcat repeat run-lengths values)))))))
-
-(defn smaller
-  "Make numbers smaller"
-  [x]
-  (double (/ x 100)))
 
 (defspec hdr-histogram-spec
   test-opts
