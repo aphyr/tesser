@@ -3,7 +3,7 @@
   (:refer-clojure :exclude [min max])
   (:import (org.HdrHistogram EncodableHistogram
                              DoubleHistogram
-                             HistogramIterationValue)
+                             DoubleHistogramIterationValue)
            (java.nio ByteBuffer)
            (java.util.zip Deflater))
   (:require [tesser.utils :refer :all]
@@ -55,14 +55,6 @@
          (map (fn [[[x c] [x' c']]]
                 [x' (- c' c)])))))
 
-(defprotocol Buffers
-  (buf-capacity [x] "How many bytes are we gonna need, tops?")
-  (write-buf! [x ^ByteBuffer b] "Write x to a ByteBuffer. Mutates b by writing
-                                bytes to the current position, leaving the
-                                position advanced.")
-  (read-buf!  [x ^ByteBuffer b] "Read a new instance of x from byte buffer b.
-                                Mutates b by advancing the position."))
-
 (defn ^"[B" byte-buffer->bytes
   "Convert a byte buffer to a byte array."
   [^ByteBuffer buffer]
@@ -70,14 +62,10 @@
     (.get buffer array)
     array))
 
-(defn write-buf
-  "Write the given thing to a fresh ByteBuffer and returns that buffer, flipped
-  so it's ready for reading."
-  ([x]
-   (let [buf (ByteBuffer/allocate (buf-capacity x))]
-     (write-buf! x buf)
-     (.flip buf)
-     buf)))
+(defn ^ByteBuffer bytes->byte-buffer
+  "Convert a bytebuffer to a byte array."
+  [^bytes bs]
+  (ByteBuffer/wrap bs))
 
 ; TODO: dynamically detect dependencies and load these extensions
 ; I'd include em all by default but the jar gets *massive*
@@ -108,23 +96,13 @@
 
   CumulativeDistribution
   (cumulative-distribution [digest]
-    ; multiply by conversion factor to correct for
-    ; https://github.com/HdrHistogram/HdrHistogram/issues/35
     (->> digest
-         ;.allValues
          .recordedValues
          .iterator
          iterator-seq
-         (map (fn [^HistogramIterationValue i]
-                [(.getDoubleValueIteratedTo i)
-                 (.getTotalCountToThisValue i)]))))
-
-  Buffers
-  (buf-capacity     [digest] (.getNeededByteBufferCapacity digest))
-  (write-buf!       [digest b]
-    (.encodeIntoCompressedByteBuffer digest b Deflater/DEFAULT_COMPRESSION))
-  (read-buf         [_ b]
-    (DoubleHistogram/decodeFromCompressedByteBuffer b 0)))
+         (map (fn [^DoubleHistogramIterationValue i]
+                [(.getValueIteratedTo i)
+                 (.getTotalCountToThisValue i)])))))
 
 (defn hdr-histogram
   "Constructs a new HDRHistogram for doubles. Default options:
@@ -222,32 +200,7 @@
                 ; Positive distribution
                 (->> (cumulative-distribution pos)
                      (map (fn [[point total]]
-                            [point (+ total pos-offset)])))))))
-
-  Buffers
-  (buf-capacity [this]
-    (+ (buf-capacity neg) (buf-capacity pos)))
-
-  (write-buf! [digest b]
-    (let [offset (.position b)]
-      ; Leave space for size headers
-      (.position b (+ offset 8))
-      ; Write negatives
-      (write-buf! neg b)
-      (let [neg-end (.position b)]
-        ; Write positives
-        (write-buf! pos b)
-        (let [pos-end (.position b)]
-          ; Write size headers
-          (.putInt b offset (- neg-end offset 8))
-          (.putInt b offset (- pos-end neg-end))))))
-
-  (read-buf! [_ b]
-    (let [neg-size (.getInt b)
-          pos-size (.getInt b)]
-      ; Use negative and positive as hints as to how to interpret b.
-      (DualHistogram. (read-buf! neg b)
-                      (read-buf! pos b)))))
+                            [point (+ total pos-offset)]))))))))
 
 (defn dual
   "HDRHistogram can't deal with negative values. This function takes a function

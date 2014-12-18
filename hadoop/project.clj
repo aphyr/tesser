@@ -1,0 +1,22 @@
+(defproject tesser.hadoop "0.1.0-SNAPSHOT"
+  :description "Tesser: Hadoop support via Parkour."
+  :url "http://github.com/aphyr/tesser"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :java-source-paths ["src/"]
+  :repositories
+  {"cloudera" "https://repository.cloudera.com/artifactory/cloudera-repos/"}
+  :dependencies [[tesser.core "0.1.0-SNAPSHOT"]
+                 [tesser.math "0.1.0-SNAPSHOT"]
+                 [org.clojure/data.fressian "0.2.0"]
+                 [com.damballa/parkour "0.5.4"]
+                 [org.codehaus.jsr166-mirror/jsr166y "1.7.0"]
+                 [proteus "0.1.4"]]
+  :profiles {:dev
+             {:dependencies [[org.clojure/clojure "1.6.0"]
+                             [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
+                             [criterium "0.4.3"]
+                             [org.clojure/test.check "0.6.2-SNAPSHOT"]]}
+             :provided
+             {:dependencies
+              [[org.apache.hadoop/hadoop-client "2.0.0-mr1-cdh4.3.0"]]}})
