@@ -19,10 +19,10 @@
 (defspec digest-serialization-spec
   test-opts
   (prop/for-all [xs (gen/vector gen/pos-int)]
-                (let [digest (DoubleHistogram. 1e8 3)]
+                (let [digest (q/dual q/hdr-histogram)]
                   ; Fill digest
                   (doseq [x xs]
-                    (.recordValue digest x))
+                    (q/add-point! digest x))
 
                   ; Serialize and deserialize
                   (let [digest' (-> digest
