@@ -4,6 +4,10 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[interval-metrics "1.0.0"]]
+  :jvm-opts ["-server"
+             "-Dcom.sun.management.jmxremote"
+             "-XX:+UnlockCommercialFeatures"
+             "-XX:+FlightRecorder"]
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
                                   [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
                                   [criterium "0.4.3"]
