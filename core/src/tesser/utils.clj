@@ -121,6 +121,10 @@
   [path]
   (fn [x] (get-in x path)))
 
+(defn var->sym
+  "Converts a var to fully qualified symbol."
+  [^clojure.lang.Var v]
+  (symbol (name (.name (.ns v))) (name (.sym v))))
 
 (defn complete-triangular-matrix
   "Given a map of [x y] keys to values, returns a map where *both* [x y] and [y
@@ -134,6 +138,11 @@
   collection."
   [_ x]
   (when-not (nil? x) (reduced x)))
+
+(defn reduce-first
+    "clojure.core/first, but for for reducibles."
+    [reducible]
+    (reduce (fn [_ x] (reduced x)) nil reducible))
 
 (defmacro scred
   "Helper for short-circuiting nested reduction functions which can emit

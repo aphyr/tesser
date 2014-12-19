@@ -4,13 +4,10 @@
                [pprint :refer [pprint]]]
               [clojure.core.reducers :as r]
               [clojure.data.fressian :as fress]
-              audience.analysis.hadoop.serialization
-              [audience.analysis [utils :refer :all]
-               [file :as file]
-               [core :as core]
-               [folds :as folds]
-               [main :as main]
-               [data :as data]]
+              tesser.hadoop.serialization
+              [tesser
+               [utils :refer :all]
+               [core :as t]]
               [parkour [conf :as conf]
                [fs :as fs]
                [mapreduce :as mr]
@@ -19,11 +16,8 @@
                [wrapper :as wrapper]]
               [parkour.io [text :as text]
                [seqf :as seqf]
-               [sample :as sample]]
-              [incanter [core :as incanter]
-               [charts :as charts]]
-              [clojure.tools.cli :as cli])
-  (:import (audience.analysis.hadoop_support FressianWritable)
+               [sample :as sample]])
+  (:import (tesser.hadoop_support FressianWritable)
            (java.io DataInput
                     DataOutput
                     IOException
@@ -31,7 +25,6 @@
                     ByteArrayInputStream
                     ByteArrayOutputStream)
            (java.nio ByteBuffer)
-           (com.clearspring.analytics.stream.quantile QDigest)
            (org.apache.hadoop.io Text
                                  LongWritable
                                  NullWritable
@@ -47,8 +40,7 @@
   (-> fold-name
       resolve
       deref
-      (apply fold-args)
-      core/normalize-fold))
+      (apply fold-args)))
 
 (defn serialize-error
   "Convert an exception to an error."
@@ -98,14 +90,16 @@
    ::mr/sink-as   :vals}
   [fold-name fold-args input]
   (list (try (let [fold (rehydrate-fold fold-name fold-args)
-                   red  (:reducer fold)]
-               (reduce (fn [acc line]
-                         (try
-                           (red acc line)
-                           (catch Exception e
-                             (reduced (serialize-error acc line e)))))
-                       ((:identity fold))
-                       input))
+                   red  (:reducer fold)
+                   post (:post-reducer fold)]
+               (post
+                 (reduce (fn [acc line]
+                           (try
+                             (red acc line)
+                             (catch Exception e
+                               (reduced (serialize-error acc line e)))))
+                         ((:identity fold))
+                         input)))
              (catch Exception e
                (serialize-error nil nil e)))))
 
