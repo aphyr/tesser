@@ -173,3 +173,25 @@
        (if (reduced? ~acc)
          (let [~acc (deref ~acc)] (reduced ~expr))
          ~expr))))
+
+(defn partition-vec
+  "partitions a vector into groups of n (somewhat like partition)
+   but uses subvec for speed.
+  (partition-vec 2 [1]) => ([1])
+  (partition-vec 2 [1 2 3]) => ([1 2] [3])
+  Unlike partition, won't return empty subsequences in cases like
+  (partition-vec 2 [1])
+  Useful for supplying vectors to tesser.core/tesser."
+  ([v] (partition-vec 512 v))
+  ([^long n v]
+   (let [total-size (count v)]
+     (loop [start 0
+            end (min n total-size)
+            out (transient [])]
+     (let [curr (subvec v start end)]
+       (if (< (- end start) n)
+         (persistent! (conj! out curr))
+         (recur
+           end
+           (min (+ end n) total-size)
+           (conj! out curr))))))))
