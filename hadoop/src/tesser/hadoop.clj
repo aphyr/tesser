@@ -32,13 +32,23 @@
                                  Writable)
            (org.apache.hadoop.mapred JobPriority)))
 
+(defn resolve+
+  "Resolves a symbol to a var, requiring the namespace if necessary. If the
+  namespace doesn't exist, throws just like `clojure.core/require`. If the
+  symbol doesn't exist after requiring, returns nil."
+  [sym]
+  (or (resolve sym)
+      (let [ns (->> sym str (re-find #"(.+)\/") second symbol)]
+        (require ns)
+        (resolve sym))))
+
 (defn rehydrate-fold
   "Takes the name of a function that generates a fold (a symbol) and args for
   that function, and invokes the function with args to build a fold. Normalizes
   that fold and returns it."
   [fold-name fold-args]
   (-> fold-name
-      resolve
+      resolve+
       deref
       (apply fold-args)))
 
@@ -102,7 +112,6 @@
                          input)))
              (catch Exception e
                (serialize-error nil nil e)))))
-
 
 (defn fold-reducer
   "This function returns a reducer for fold defined by make-fold
@@ -180,7 +189,7 @@
   (let [in       (pg/input input)
         path     (name (var->sym fold-var))]
     (try
-      (let [x (-> (apply fold in fold-var args)
+      (let [x (-> (apply fold* in fold-var args)
                   (pg/output (dsink workdir path))
                   (execute conf)
                   first)]
