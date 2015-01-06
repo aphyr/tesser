@@ -17,3 +17,11 @@
                        (->> coll
                             differences
                             (cumulative-sums (first coll)))))))
+
+(defspec partition-vec-spec
+  test-opts
+  (prop/for-all [coll (gen/vector gen/int)]
+                (is (= coll
+                       (->> coll
+                         partition-vec
+                         flatten)))))
