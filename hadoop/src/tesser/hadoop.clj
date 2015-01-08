@@ -119,7 +119,7 @@
                (serialize-error nil nil e)))))
 
 (defn fold-reducer
-  "This function returns a reducer for fold defined by make-fold
+  "This function returns a parkour reducer for fold defined by make-fold
   applied to fold-name & additional args"
   {::mr/source-as :vals
    ::mr/sink-as   :vals}
@@ -161,7 +161,7 @@
   increment sequentially from there. Job names are printed to stderr when
   generated."
   []
-  (let [n (str "audience-analysis-" (swap! job-name-counter inc))]
+  (let [n (str "tesser-" (swap! job-name-counter inc))]
     (binding [*out* *err*]
       (println "\n## Job" n "\n"))
     n))
