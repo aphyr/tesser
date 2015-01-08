@@ -44,21 +44,24 @@
 
 (defn rehydrate-fold
   "Takes the name of a function that generates a fold (a symbol) and args for
-  that function, and invokes the function with args to build a fold. Normalizes
-  that fold and returns it."
+  that function, and invokes the function with args to build a fold, which is
+  then compiled and returned."
   [fold-name fold-args]
   (-> fold-name
       resolve+
       deref
-      (apply fold-args)))
+      (apply fold-args)
+      t/compile-fold))
 
 (defn serialize-error
   "Convert an exception to an error."
   [state input e]
-  (prn "Creating error" state input e)
+  ; Log locally so we'll have something in the hadoop logs
+  (.printStackTrace e)
   {::error?  true
-   :class   (str (class e))
+   :class   (.getName (class e))
    :message (.getMessage e)
+   :string  (.toString e)
    :trace   (->> (.getStackTrace e)
                  (map (fn [^StackTraceElement frame]
                         (str (.getClassName frame) " "
@@ -81,16 +84,18 @@
   (locking *out*
     (binding [*out* *err*]
       (println)
-      (println "## Haderp Error" (:class e))
-      (println)
-      (println (:message e))
-      (println (:trace e))
+      (println "## Hadoop Error:" (:class e))
       (println)
       (println "State prior to reduction error:")
       (pprint (:state e))
       (println)
       (println "Input that caused reduction error:")
-      (println (:input e)))))
+      (println (:input e))
+      (println)
+      (println (:class e))
+      (println (:message e))
+      (println (:string e))
+      (println (:trace e)))))
 
 (defn fold-mapper
   "A generic, stateful hadoop mapper for applying a fold to a Hadoop dataset.
