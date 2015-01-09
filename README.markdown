@@ -10,6 +10,38 @@
 
 — Madeline L'Engle, *A Wrinkle In Time*.
 
+## The Story Of Your Life and Reductions
+
+You've got a big pile of data--say, JSON in files on disk, or TSVs in
+Hadoop--and you'd like to reduce over that data, computing some small
+statistics efficiently. You might want to find the median housing price in each
+city given a collection of all sales, or find the total mass of all
+main-sequence stars in a region of sky, or search for an anticorrelation
+between vaccine use and the prevalence of a disease. These are all *folds*:
+collapsing a collection of data into a smaller value.
+
+In Clojure, we're used to writing programs like
+
+```clj
+(->> stars
+     (filter main-sequence?)
+     (map :mass)
+     (reduce +))
+```
+
+But this reduction is *singlethreaded*, and can only run on a single machine.
+You've got 48 cores in your desktop computer. Why aren't they all helping?
+
+```clj
+(require '[tesser.core :as t])
+(->> (t/filter main-sequence)
+     (t/map :mass)
+     (t/sum)
+     (t/tesser (partition 100 stars)))
+```
+
+Tesser goes much deeper than this, but this is the essence: writing understandable, composable, efficient, parallel programs for reducing datasets.
+
 ## A Clojure Library for Concurrent & Commutative Folds
 
 Clojure's reducers and transducers embody sequential folds: they move from left
@@ -37,7 +69,7 @@ Via Clojars, as usual.
   essential folds
 - [tesser.math](https://clojars.org/tesser.math) - Statistical folds: means,
   correlations, covariance matrices, quantiles, etc.
-- tesser.hadoop - Run folds on Hadoop. Coming soon!
+- [tesser.hadoop](https://clojars.org/tesser.hadoop) - Run folds on Hadoop.
 
 ## Core
 
@@ -132,12 +164,43 @@ Ready? [To the tesser.math API!](http://aphyr.github.io/tesser/tesser.math.html)
 
 ## Hadoop
 
-Coming soon.
+The [tesser.hadoop API](http://aphyr.github.io/tesser/tesser.hadoop.html) takes
+Tesser folds and distributes them using the
+[Parkour](https://github.com/damballa/parkour) Hadoop library. You can test
+your folds locally, then run them on a cluster to reduce over huge datasets.
+
+```clj
+(require '[tesser [core :as t]
+                  [math :as m]
+                  [hadoop :as h]])
+
+(defn analyze
+  "A fold that analyzes measurements of trees from a certain location."
+  [location]
+  (t/map parse-record)
+  (t/filter #(= location (:location %)))
+  (t/fuse {:count (t/count)
+           :oldest (->> (t/map :age)
+                        (t/max))
+           :corrs (m/correlation-matrix {:age          :age
+                                         :log-mass     #(Math/log (:mass %))
+                                         :growth-rings :growth-rings
+                                         :humidity     :humdity})}))
+
+(h/fold conf
+        (text/dseq "hdfs:/some/file/part-*")
+        "hdfs:/tmp/tesser"
+        #'analyze "Redwood National Park")
+```
+
+See the [Hadoop demo
+project](https://github.com/aphyr/tesser/tree/master/hadoop/demo) for an
+example of how to run a fold in Hadoop.
 
 ## Contributors
 
 - [Kyle Kingsbury](mailto:aphyr@aphyr.com)
-- [Natasha Whitney](mailto:natiwhitney@gmail.com) 
+- [Natasha Whitney](mailto:natiwhitney@gmail.com)
 - Factual, Inc
 
 ## License

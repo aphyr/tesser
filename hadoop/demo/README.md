@@ -29,7 +29,7 @@ Then we'll run that jar in Hadoop against our temp dir and input files:
 hadoop jar \
   target/tesser-hadoop-demo-0.1.0-SNAPSHOT-standalone.jar \
   hdfs:/tmp/kingsbury/demo \
-  hdfs:/data/foo/2014.09.30_10.28a/0_1/part-0000*
+  hdfs:/data/foo/0_1/part-*
 ```
 
 Tesser automatically generates a short random job name and submits it to the
@@ -156,7 +156,7 @@ And stdout: a frequency distribution of characters in the input text.
 
 ## License
 
-Copyright © 2015 FIXME
+Copyright © 2015 Kyle Kingsbury
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
