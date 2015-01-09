@@ -10,7 +10,7 @@
 
 — Madeline L'Engle, *A Wrinkle In Time*.
 
-## The Story Of Your Life and Reductions
+## A Motivating Example
 
 You've got a big pile of data--say, JSON in files on disk, or TSVs in
 Hadoop--and you'd like to reduce over that data, computing some small
