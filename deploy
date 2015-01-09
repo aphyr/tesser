@@ -1,0 +1,7 @@
+#!/bin/sh
+cd core      && lein do clean, test, install, deploy clojars
+cd ../math   && lein do clean, test, install, deploy clojars
+cd ../hadoop && lein do clean, test, install, deploy clojars
+cd ../all    && lein do clean, doc
+cd doc       && git commit -am "docs" && git push
+cd ../../
