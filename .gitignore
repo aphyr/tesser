@@ -8,5 +8,5 @@ pom.xml.asc
 *.class
 *.hprof
 .*.swp
-/.lein-*
-/.nrepl-port
+.lein-*
+.nrepl-port
