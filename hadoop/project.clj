@@ -18,7 +18,4 @@
              {:dependencies [[org.clojure/clojure "1.6.0"]
                              [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
                              [criterium "0.4.3"]
-                             [org.clojure/test.check "0.6.2-SNAPSHOT"]]}
-             :provided
-             {:dependencies
-              [[org.apache.hadoop/hadoop-client "2.0.0-mr1-cdh4.3.0"]]}})
+                             [org.clojure/test.check "0.6.2-SNAPSHOT"]]}})
