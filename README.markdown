@@ -40,7 +40,8 @@ You've got 48 cores in your desktop computer. Why aren't they all helping?
      (t/tesser (partition 100 stars)))
 ```
 
-Tesser goes much deeper than this, but this is the essence: writing understandable, composable, efficient, parallel programs for reducing datasets.
+Tesser goes much deeper, but this is the essence: writing understandable,
+composable, parallel programs for exploring datasets.
 
 ## A Clojure Library for Concurrent & Commutative Folds
 
@@ -196,6 +197,92 @@ your folds locally, then run them on a cluster to reduce over huge datasets.
 See the [Hadoop demo
 project](https://github.com/aphyr/tesser/tree/master/hadoop/demo) for an
 example of how to run a fold in Hadoop.
+
+## An integrative example
+
+Here's a real-world example, drawn from a user profile verification suite:
+
+```clj
+(require '[tesser.core :as t]
+          [tesser.math :as m]
+          [tesser.quantiles :as q])
+
+(defn fold
+  "Computes aggregate statistics over profiles by country, income, age range,
+  and gender."
+  []
+  (t/fuse
+    {:total     (t/count)
+     :country   (->> (t/map (comp :country :geo))
+                     (t/frequencies)
+                     (t/post-combine (partial into (sorted-map))))
+     :income    (->> (t/map (comp :value :income))
+                     (t/remove nil?)
+                     (m/digest (partial q/dual q/hdr-histogram))
+                     (t/post-combine q/distribution))
+     :no-income (->> (t/remove (comp :value :income))
+                     (t/count))
+     :age-range (->> (t/map (comp :range :age :demographic))
+                     (t/frequencies)
+                     (t/post-combine (partial into (sorted-map))))
+     :gender    (->> (t/map (fn [u]
+                             (let [g (-> u :demographic :gender)
+                                   m (-> g :male :confidence)
+                                   f (-> g :female :confidence)]
+                               (cond (not (or m f)) nil
+                                     (not m)        :female
+                                     (not f)        :male
+                                     (<= -1/2 (- m f) 1/2) :rich-tapestry
+                                     (<= m f)       :female
+                                     :else          :male))))
+                     (t/frequencies))}))
+```
+
+Here's another fold, from a namespace that analyzes behavioral segments (e.g.
+commuters).  We're using the `metric-fold` function to do the same type of
+numeric reduction (a range and a quantile digest) over two different fields:
+`:percentile` and `:confidence`. Note that `metric-fold` takes an argument `f`:
+the fold that it will transform.
+
+```clj
+(defn metric-fold
+  "A fold which analyzes the range and quantile distribution of a number,
+  returing a map of :range and :q-digest. Drops nils."
+  [f]
+  (->> f
+       (t/remove nil?)
+       (t/fuse {:q-digest (m/digest (∂ q/dual q/hdr-histogram))
+                :range    (t/range)})))
+
+(defn fold
+  "Analyzes behavioral segments. Emits nested maps where the first key is the
+  segment name (:leisure_seeker), the second key is one of :percentile or
+  :confidence, and the third key is one of :q-digest or :range."
+  []
+  (->> (t/map :behavioral)
+       (t/map :segments)
+       ; For each distinct segment...
+       (t/facet)
+       ; Could facet here, but fuse is a lil more efficient.
+       (t/fuse
+         {:percentile (->> (t/map :percentile) (metric-fold))
+          :confidence (->> (t/map :confidence) (metric-fold))})))
+```
+
+Because the folds act on *any* datatype, we can combine them using `fuse` and perform *both* in a single pass.
+
+```clj
+(defn main-fold [opts]
+  (->> (t/map (file/parser (:format opts)))
+       (t/fuse {:behavioral-segments (behavioral-segments/fold)
+                :demographics        (demographics/fold)})))
+```
+
+Because these folds are collection-indepedent, and defined in small chunks, we
+can write small tests to verify each folds behavior indepedently, then compose
+them into larger programs. We're free to name transformations at any level just
+by binding them to `let` variables or `defn`s, or to build complex folds in a
+single pass.
 
 ## Contributors
 
