@@ -270,7 +270,7 @@ the fold that it will transform.
           :confidence (->> (t/map :confidence) (metric-fold))})))
 ```
 
-Because the folds act on *any* datatype, we can combine them using `fuse` and perform *both* in a single pass.
+Because the folds aren't bound to any particular datatype, we can combine them using `fuse` and transform their inputs using a parser--in a single pass.
 
 ```clj
 (defn main-fold [opts]
