@@ -252,7 +252,7 @@ the fold that it will transform.
   [f]
   (->> f
        (t/remove nil?)
-       (t/fuse {:q-digest (m/digest (∂ q/dual q/hdr-histogram))
+       (t/fuse {:q-digest (m/digest (partial q/dual q/hdr-histogram))
                 :range    (t/range)})))
 
 (defn fold
