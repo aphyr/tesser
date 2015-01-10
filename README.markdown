@@ -178,15 +178,16 @@ your folds locally, then run them on a cluster to reduce over huge datasets.
 (defn analyze
   "A fold that analyzes measurements of trees from a certain location."
   [location]
-  (t/map parse-record)
-  (t/filter #(= location (:location %)))
-  (t/fuse {:count (t/count)
-           :oldest (->> (t/map :age)
-                        (t/max))
-           :corrs (m/correlation-matrix {:age          :age
-                                         :log-mass     #(Math/log (:mass %))
-                                         :growth-rings :growth-rings
-                                         :humidity     :humdity})}))
+  (->> (t/map parse-record)
+       (t/filter #(= location (:location %)))
+       (t/fuse {:count (t/count)
+                :oldest (->> (t/map :age)
+                             (t/max))
+                :corrs (m/correlation-matrix
+                         {:age          :age
+                          :log-mass     #(Math/log (:mass %))
+                          :growth-rings :growth-rings
+                          :humidity     :humdity})})))
 
 (h/fold conf
         (text/dseq "hdfs:/some/file/part-*")
