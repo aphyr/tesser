@@ -25,8 +25,4 @@
    :provided {:dependencies
               ; Replace this with the appropriate hadoop client for
               ; your hadoop cluster
-              [[org.apache.hadoop/hadoop-client "2.0.0-mr1-cdh4.3.0"
-                ; In this delightful case the Hadoop client refers to two
-                ; contradictory versions of slf4j. LMAO, Hadoop is a complete
-                ; tire fire.
-                :exclusions [org.slf4j/slf4j-api]]]}})
+              [[org.apache.hadoop/hadoop-client "2.0.0-mr1-cdh4.3.0"]]}})
