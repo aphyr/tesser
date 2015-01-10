@@ -20,12 +20,6 @@
   [digest points]
   (doseq [p points] (q/add-point! digest p)))
 
-(defn round-trip
-  "Returns a copy of a digest by serializing and deserializing it to a
-  bytebuffer."
-  [digest]
-  (->> digest q/write-buf (q/read-buf! digest)))
-
 (defn check-count
   "Verifies that a quantile estimator knows how many points it received."
   [digest points]
