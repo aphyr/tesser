@@ -41,7 +41,8 @@
     this))
 
 (defn unsafe-pair
-  "Constructs a new unsynchronized pair object."
+  "Constructs a new unsynchronized mutable pair object, suitable for
+  single-threaded mutation."
   ([] (UnsafePair. nil nil))
   ([a b] (UnsafePair. a b)))
 
@@ -56,10 +57,11 @@
          (cons [prev x] (successive-pairs x (next coll))))))))
 
 (defn differences
-  "A seq of the differences between successive elements in a collection.
+  "A seq of the differences between successive elements in a collection. For
+  example,
 
-    (differences [1 2 4 5 2])
-    ; (1 2 1 -3)"
+      (differences [1 2 4 5 2])
+      ; (1 2 1 -3)"
   [coll]
   (->> coll
        successive-pairs
@@ -67,11 +69,11 @@
 
 (defn cumulative-sums
   "A seq of the cumulative sums of all elements in `coll`, starting at `init`
-  or the first element of `coll` if `init` is not provided. The integral to
-  `differences` differential.
+  or the first element of `coll` if `init` is not provided. If `differences`
+  provides differentials, `cumulative-sums` provides integrals.
 
-    (cumulative-sums 1 [1 2 1 -3])
-    ; (1 2 4 5 2)"
+      (cumulative-sums 1 [1 2 1 -3])
+      ; (1 2 4 5 2)"
   ([coll]
    (reductions + coll))
   ([init coll]
@@ -127,9 +129,9 @@
   (symbol (name (.name (.ns v))) (name (.sym v))))
 
 (defn complete-triangular-matrix
-  "Given a map of [x y] keys to values, returns a map where *both* [x y] and [y
-  x] point to identical values. Useful for pairwise comparisons which compute
-  triangular matrices but want to return a full matrix."
+  "Given a map of `[x y]` keys to values, returns a map where *both* `[x y]`
+  and `[y x]` point to identical values. Useful for pairwise comparisons which
+  compute triangular matrices but want to return a full matrix."
   [m]
   (->> m (map (fn [[[x y] value]] [[y x] value])) (into m)))
 
@@ -140,24 +142,24 @@
   (when-not (nil? x) (reduced x)))
 
 (defn reduce-first
-    "clojure.core/first, but for for reducibles."
-    [reducible]
-    (reduce (fn [_ x] (reduced x)) nil reducible))
+  "clojure.core/first, but for for reducibles."
+  [reducible]
+  (reduce (fn [_ x] (reduced x)) nil reducible))
 
 (defmacro scred
   "Helper for short-circuiting nested reduction functions which can emit
   reduced values. Given the name of a function that could emit a reduced
   value, and an expression:
 
-    (scred rfn [1 (rfn x y)])
+      (scred rfn [1 (rfn x y)])
 
   Expands to code that converts the expression to a reduced value whenever
   the underlying function emits a reduced value:
 
-    (let [acc (rfn x y)]
-      (if (reduced? acc)
-        (let [acc @acc] (reduced [1 acc]))
-        [1 acc]))
+      (let [acc (rfn x y)]
+        (if (reduced? acc)
+          (let [acc @acc] (reduced [1 acc]))
+          [1 acc]))
 
   scred does not interpret lexical scope, so don't rebind rfn in expr.
   Uses prewalk, so the outermost fn is where scred will cut out an expr.
@@ -184,12 +186,16 @@
          ~expr))))
 
 (defn partition-vec
-  "partitions a vector into groups of n (somewhat like partition)
-   but uses subvec for speed.
-  (partition-vec 2 [1]) => ([1])
-  (partition-vec 2 [1 2 3]) => ([1 2] [3])
+  "Partitions a vector into groups of n (somewhat like partition)
+  but uses subvec for speed.
+
+      (partition-vec 2 [1])     ; => ([1])
+      (partition-vec 2 [1 2 3]) ; => ([1 2] [3])
+
   Unlike partition, won't return empty subsequences in cases like
-  (partition-vec 2 [1])
+
+      (partition-vec 2 [1])
+
   Useful for supplying vectors to tesser.core/tesser."
   ([v] (partition-vec 512 v))
   ([^long n v]
