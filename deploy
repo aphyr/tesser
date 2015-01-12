@@ -1,9 +1,9 @@
 #!/bin/sh
 $dir=`pwd`
 
-cd core      && lein do clean, test, install, deploy clojars && \
-cd ../math   && lein do clean, test, install, deploy clojars && \
-cd ../hadoop && lein do clean, test, install, deploy clojars && \
-cd ../all    && lein do clean, doc && \
-cd doc       && git commit -am "docs" && git push && \
+cd $dir/core    && lein do clean, test, install, deploy clojars && \
+cd $dir/math    && lein do clean, test, install, deploy clojars && \
+cd $dir/hadoop  && lein do clean, test, install, deploy clojars && \
+cd $dir/all     && lein do clean, doc && \
+cd $dir/all/doc && git commit -am "docs" && git push && \
 cd $dir
