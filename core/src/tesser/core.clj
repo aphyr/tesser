@@ -1,36 +1,38 @@
 (ns tesser.core
-  "The essential folds: map, mapcat, take, filter, some, any?, into, etc, plus
-  common fold combinators.
+  "The essential folds: `map`, `mapcat`, `take`, `filter`, `some`, `any?`,
+  `into`, etc, plus common fold combinators.
 
-  \"Now we will tesser, we will wrinkle again. Do you understand?\" \"No,\"
-  Meg said flatly. Mrs. Whatsit sighed. \"Explanations are not easy when they
-  are about things for which your civilization still has no words. Calvin
-  talked about traveling at the speed of light. You understand that, little
-  Meg?\" \"Yes,\" Meg nodded. \"That, of course, is the impractical, long way
-  around. We have learned to take short cuts wherever possible.\" \"Sort of
-  like in math?\" Meg asked. \"Like in math.\"
-
-  -- Madeline L'Engle, *A Wrinkle In Time*.
+  > \"Now we will tesser, we will wrinkle again. Do you understand?\" \"No,\"
+  > Meg said flatly. Mrs. Whatsit sighed. \"Explanations are not easy when they
+  > are about things for which your civilization still has no words. Calvin
+  > talked about traveling at the speed of light. You understand that, little
+  > Meg?\" \"Yes,\" Meg nodded. \"That, of course, is the impractical, long way
+  > around. We have learned to take short cuts wherever possible.\" \"Sort of
+  > like in math?\" Meg asked. \"Like in math.\"
+  >
+  > -- Madeline L'Engle, *A Wrinkle In Time*.
 
   Tesser structures partly-concurrent folds.
 
-  `(tesser some-collection a-fold)` uses `a-fold` to combine some information
-  from every element in `some-collection`. Like reducers and transducers, it
-  takes *fold* as the ultimate collection operation. Unlike transducers, Tesser
-  folds are not sequential. They include an explicitly concurrent reduction
-  over arbitrary partitions of the collection, and a sequential reduction over
-  *those* reduced values, termed *combine*. Like transducers, Tesser folds can
-  also map and filter their inputs, and perform post-processing transformation
-  after each reduction and the combine step.
+  `(tesser some-collections a-fold)` uses `a-fold` to combine some information
+  from every element in `some-collections`: a collection of collections of
+  inputs. Like reducers and transducers, it takes *fold* as the ultimate
+  collection operation. Unlike transducers, Tesser folds are not sequential.
+  They include an explicitly concurrent reduction over arbitrary partitions of
+  the collection, and a sequential reduction over *those* reduced values,
+  termed *combine*. Like transducers, Tesser folds can also map and filter
+  their inputs, and perform post-processing transformation after each reduction
+  and the combine step.
 
   Tesser folds can be composed with the standard collection threading idioms,
-  and evaluated against a collection of collections using (tesser colls fold).
+  and evaluated against a collection of collections using `(tesser colls
+  fold)`.
 
-  (->> (t/map inc)
-       (t/filter even?)
-       (t/reduce +)
-       (t/tesser [[1 2 3] [4 5 6]]))
-  ; => 2 + 4 + 6 = 12"
+      (->> (t/map inc)
+           (t/filter even?)
+           (t/reduce +)
+           (t/tesser [[1 2 3] [4 5 6]]))
+      ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
                             not-every? replace group-by])
@@ -233,9 +235,9 @@
   "Compiles a fold (a sequence of transforms, each represented as a function
   taking the next transform) to a single map like
 
-  {:identity (fn [] ...),
-   :reducer  (fn [acc x] ...)
-   ...}"
+      {:identity (fn [] ...),
+       :reducer  (fn [acc x] ...)
+       ...}"
   [fold]
   (->> fold
        reverse
@@ -319,16 +321,16 @@
 (defmacro deftransform*
   "We're trying to build functions that look like...
 
-    (defn map
-      \"Takes a function `f` and an optional fold. Returns a version of the
-      fold which finally calls (f element) to transform each element.\"
-      ([f]
-       (map f []))
-      ([f fold]
-       (append fold
-               (fn build [{:keys [reducer] :as downstream}]
-                 (assoc downstream :reducer
-                        (fn reducer [acc input] (reducer acc (f input)))))))))
+      (defn map
+        \"Takes a function `f` and an optional fold. Returns a version of the
+        fold which finally calls (f element) to transform each element.\"
+        ([f]
+         (map f []))
+        ([f fold]
+         (append fold
+                 (fn build [{:keys [reducer] :as downstream}]
+                   (assoc downstream :reducer
+                          (fn reducer [acc input] (reducer acc (f input)))))))))
 
   Which involves a fair bit of shared boilerplate: the single-arity variant of
   the transform, the append/prepend logic, the annealing function and its
@@ -378,10 +380,10 @@
   "Given a map of replacement pairs, maps any inputs which are keys in the map
   to their corresponding values. Leaves unrecognized inputs alone.
 
-    (->> (t/replace {:x false})
-         (t/into [])
-         (t/tesser [[:x :y]]))
-    ; => [false :y]"
+      (->> (t/replace {:x false})
+           (t/into [])
+           (t/tesser [[:x :y]]))
+      ; => [false :y]"
   [m & [f]]
   (->> f
        (map (fn sub [x] (get m x x)))))
@@ -582,16 +584,16 @@
   For instance, to find the square root of the mean of a sequence of numbers,
   try
 
-    (->> (t/mean) (t/post-combine sqrt) (t/tesser nums))
+      (->> (t/mean) (t/post-combine sqrt) (t/tesser nums))
 
   For clarity in ->> composition, post-combine composes in the opposite
   direction from map, filter, etc. It *prepends* a transform to the given fold
   instead of *appending* one. This means post-combines take effect in the same
   order you'd expect from ->> with normal function calls:
 
-    (->> (t/mean)                 (->> (mean nums)
-         (t/post-combine sqrt)         (sqrt)
-         (t/post-combine inc))         (inc))"
+      (->> (t/mean)                 (->> (mean nums)
+           (t/post-combine sqrt)         (sqrt)
+           (t/post-combine inc))         (inc))"
   [f]
   (assoc downstream :post-combiner
          (fn post-combiner [x]
@@ -610,14 +612,14 @@
   For instance, say we have a collection of particles of various types, and
   want to find the highest mass of each particle type:
 
-    (->> (t/group-by :type)
-         (t/map :mass)
-         (t/max)
-         (t/tesser [[{:name :electron, :type :lepton, :mass 0.51}
-                     {:name :muon,     :type :lepton, :mass 105.65}
-                     {:name :up,       :type :quark,  :mass 1.5}
-                     {:name :down,     :type :quark,  :mass 3.5}]]))
-    ; => {:lepton 105.65, :quark 3.5}"
+      (->> (t/group-by :type)
+           (t/map :mass)
+           (t/max)
+           (t/tesser [[{:name :electron, :type :lepton, :mass 0.51}
+                       {:name :muon,     :type :lepton, :mass 105.65}
+                       {:name :up,       :type :quark,  :mass 1.5}
+                       {:name :down,     :type :quark,  :mass 3.5}]]))
+      ; => {:lepton 105.65, :quark 3.5}"
   [category-fn]
   {:identity        (constantly {})
    :reducer         (fn reducer [acc input]
@@ -642,18 +644,18 @@
 
   For instance, say you have inputs like
 
-  {:x 1, :y 2}
-  {}
-  {:y 3, :z 4}
+      {:x 1, :y 2}
+      {}
+      {:y 3, :z 4}
 
   Then the fold
 
-  (->> (facet)
-       (mean))
+      (->> (facet)
+           (mean))
 
   returns a map for each key's mean value:
 
-  {:x 1, :y 2, :z 4}"
+      {:x 1, :y 2, :z 4}"
   []
   {:identity      (constantly {})
    :reducer       (fn reducer [acc m]
@@ -677,19 +679,19 @@
   "You've got several folds, and want to execute them in one pass. Fuse is the
   function for you! It takes a map from keys to folds, like
 
-    (->> (map parse-person)
-         (fuse {:age-range    (->> (map :age) (range))
-                :colors-prefs (->> (map :favorite-color) (frequencies))})
-         (tesser people))
+      (->> (map parse-person)
+           (fuse {:age-range    (->> (map :age) (range))
+                  :colors-prefs (->> (map :favorite-color) (frequencies))})
+           (tesser people))
 
   And returns a map from those same keys to the results of the corresponding
   folds:
 
-    {:age-range   [0 74],
-     :color-prefs {:red        120
-                   :blue       312
-                   :watermelon 1953
-                   :imhotep    1}}
+      {:age-range   [0 74],
+       :color-prefs {:red        120
+                     :blue       312
+                     :watermelon 1953
+                     :imhotep    1}}
 
   Note that this fold only invokes `parse-person` once for each record, and
   completes in a single pass. If we ran the age and color folds independently,
@@ -775,8 +777,8 @@
   requires N calls to `pred`. However, unlike clojure.core/some, this version
   is parallelizable--which can make it more efficient when the element is rare.
 
-    (t/tesser [[1 2 3] [4 5 6]] (t/some #{1 2}))
-    ; => 1"
+      (t/tesser [[1 2 3] [4 5 6]] (t/some #{1 2}))
+      ; => 1"
   [pred]
   (assert (nil? downstream))
   {:identity      (constantly nil)
@@ -799,9 +801,10 @@
 
 (defn empty?
   "Returns true iff no inputs arrive; false otherwise.
+  For instance:
 
-    (t/tesser [[]] (t/empty?))
-    ; => true"
+      (t/tesser [[]] (t/empty?))
+      ; => true"
   [& [f]]
   (->> f
        (map (fn [_] true))
@@ -809,10 +812,11 @@
        (post-combine (complement boolean))))
 
 (defn every?
-  "True iff every input satisfies the given predicate, false otherwise.
+  "True iff every input satisfies the given predicate, false otherwise. For
+  instance:
 
-    (t/tesser [[1 3 5]] (t/every? odd?))
-    ; => true"
+      (t/tesser [[1 3 5]] (t/every? odd?))
+      ; => true"
   [pred & [f]]
   (->> f
        (remove pred)
@@ -820,9 +824,10 @@
 
 (defn not-every?
   "True if there exists an input which does *not* satisfy the given predicate.
+  For instance:
 
-    (t/tesser [[1 3 5] [6]] (t/not-every? odd?))
-    ; => true"
+      (t/tesser [[1 3 5] [6]] (t/not-every? odd?))
+      ; => true"
   [pred & [f]]
   (->> f
        (every? pred)
@@ -833,7 +838,7 @@
 ;; Comparable folds
 
 (deftransform extremum
-  "Finds the largest element using a comparison function (default: compare)."
+  "Finds the largest element using a comparison function (default: `compare`)."
   [compare]
   (assert (nil? downstream))
   (letfn [(extremum-reducer [m x]
@@ -858,7 +863,7 @@
   (->> f (extremum compare)))
 
 (defn range
-  "Returns a pair of [smallest largest] inputs, using `compare`."
+  "Returns a pair of `[smallest largest]` inputs, using `compare`."
   [& [f]]
   (->> f
        (fuse {:min (min)
