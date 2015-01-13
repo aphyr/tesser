@@ -1,5 +1,6 @@
 (ns tesser.hadoop.serialization
-  "Lets us serialize Tesser reduction state through Hadoop."
+  "Lets us serialize Tesser reduction state for transport through various
+  distributed systems"
   (:require [clojure.data.fressian :as fress]
             [clojure.walk :as walk]
             [parkour.wrapper :as wrapper]
@@ -25,12 +26,12 @@
   some-number). Returns a map with two keys: :readers, and :writers, each value
   being a map suitable for use as a Fressian reader or writer, respectively.
 
-  (handler QDigest \"q-digest\"
-    (write [_ writer digest]
-      (write-tag! 1)
-      (.writeBytes writer (QDigest/serialize digest)))
-    (read [_ reader tag component-count]
-      (QDigest/deserialize ^bytes (.readObject reader))))"
+      (handler QDigest \"q-digest\"
+        (write [_ writer digest]
+          (write-tag! 1)
+          (.writeBytes writer (QDigest/serialize digest)))
+        (read [_ reader tag component-count]
+          (QDigest/deserialize ^bytes (.readObject reader))))"
   [classname tag write-expr read-expr]
   (let [writer-sym  (-> write-expr second second)
         write-expr (walk/prewalk
@@ -49,30 +50,30 @@
 
 (defmacro handlers
   "Takes a flat series of handler quartets: class-name, tag, writer, reader, as
-  per `handler`. Returns a {:writers {...}, :readers {...}} map, where all
+  per `handler`. Returns a `{:writers {...}, :readers {...}}` map, where all
   writers are merged into a unified map, merged with the clojure default
   handlers, and wrapped with inheritance/associative lookups. Does the same for
-  the readers map, but without inheritance lookups. :readers and :writers may
-  be passed to Fressian.
+  the readers map, but without inheritance lookups. `:readers` and `:writers`
+  may be passed to Fressian.
 
-  (handlers
-    QDigest \"q-digest\"
-    (write [_ writer digest]
-      (write-tag! 1)
-      (.writeBytes writer (QDigest/serialize digest)))
-    (read [_ reader tag component-count]
-      (QDigest/deserialize ^bytes (.readObject reader)))
+      (handlers
+        QDigest \"q-digest\"
+        (write [_ writer digest]
+          (write-tag! 1)
+          (.writeBytes writer (QDigest/serialize digest)))
+        (read [_ reader tag component-count]
+          (QDigest/deserialize ^bytes (.readObject reader)))
 
-    clojure.lang.PersistentVector \"vector\"
-    (write [_ writer v]
-      (write-tag! (count v))
-      (doseq [e v]
-        (.writeObject writer e)))
-    (read [_ rdr tag component-count]
-          (let [v (transient [])]
-            (dotimes [_ component-count]
-              (conj! v (.readObject rdr)))
-            (persistent! v))))"
+        clojure.lang.PersistentVector \"vector\"
+        (write [_ writer v]
+          (write-tag! (count v))
+          (doseq [e v]
+            (.writeObject writer e)))
+        (read [_ rdr tag component-count]
+              (let [v (transient [])]
+                (dotimes [_ component-count]
+                  (conj! v (.readObject rdr)))
+                (persistent! v))))"
   [& quartets]
   (let [handlers (partition 4 quartets)
         names    (repeatedly (count handlers) (partial gensym "handler"))]
