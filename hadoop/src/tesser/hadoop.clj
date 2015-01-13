@@ -179,7 +179,7 @@
 
 (defn dsink
   "Given a work directory and a string name for this file, builds a dsink for a
-  fold to dump its output to, in [NullWritable FressianWritable] format."
+  fold to dump its output to, in `[NullWritable FressianWritable]` format."
   [work-dir file-name]
   (->> file-name
               (fs/path work-dir)
@@ -189,7 +189,7 @@
   "A simple, all-in-one fold operation. Takes a jobconf, workdir, input dseq,
   var which points to a fold function, and arguments for the fold function.
   Runs the fold against the dseq and returns its results. Names output dsink
-  after fold symbol. On error, throws as an ex-info."
+  after fold symbol. On error, throws an `ex-info`."
   [conf input workdir fold-var & args]
   (let [in       (pg/input input)
         path     (name (var->sym fold-var))]
