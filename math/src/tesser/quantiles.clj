@@ -105,10 +105,11 @@
                  (.getTotalCountToThisValue i)])))))
 
 (defn hdr-histogram
-  "Constructs a new HDRHistogram for doubles. Default options:
+  "Constructs a new HDRHistogram for doubles.
+  Default options:
 
-  {:highest-to-lowest-value-ratio 1e13
-   :significant-value-digits      4}"
+      {:highest-to-lowest-value-ratio 1e13
+       :significant-value-digits      4}"
   ([] (hdr-histogram {}))
   ([opts]
    (DoubleHistogram. (or (:highest-to-lowest-value-ratio opts) 1e8)
@@ -208,7 +209,7 @@
   *two* of the underlying estimator, one for positive numbers, and one for
   negative numbers.
 
-  (dual hdr-histogram {:significant-value-digits 4}))"
+      (dual hdr-histogram {:significant-value-digits 4}))"
   ([h] (dual h {}))
   ([h opts]
    (DualHistogram. (h opts) (h opts))))

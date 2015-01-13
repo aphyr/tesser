@@ -61,12 +61,12 @@
   (->> f (variance) (t/post-combine sqrt)))
 
 (deftransform covariance
-  "Given two functions of an input (fx input) and (fy input), each of which
+  "Given two functions of an input `(fx input)` and `(fy input)`, each of which
   returns a number, estimates the unbiased covariance of those functions over
   inputs.
 
-  Ignores any inputs where (fx input) or (fy input) are nil. If no inputs have
-  both x and y, returns nil."
+  Ignores any inputs where `(fx input)` or `(fy input)` are nil. If no inputs
+  have both x and y, returns nil."
   [fx fy]
   (assert (nil? downstream))
   {:identity (constantly [0 0 0 0])
