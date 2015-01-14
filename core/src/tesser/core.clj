@@ -608,7 +608,7 @@
     clojure.lang.ArityException, in which case we return `acc` directly.
 
   This means you can use probably `(reduce f init)` as a phase anywhere `f` is
-  associative and commutative.
+  associative and commutative, and where `init` is immutable.
 
       (->> (t/map inc)
            (t/reduce + 0)

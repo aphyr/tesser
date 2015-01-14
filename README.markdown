@@ -26,7 +26,7 @@ In Clojure, we're used to writing programs like
 (->> stars
      (filter main-sequence?)
      (map :mass)
-     (reduce +))
+     (reduce + 0))
 ```
 
 But this reduction is *singlethreaded*, and can only run on a single machine.
@@ -36,12 +36,28 @@ You've got 48 cores in your desktop computer. Why aren't they all helping?
 (require '[tesser.core :as t])
 (->> (t/filter main-sequence)
      (t/map :mass)
-     (t/sum)
+     (t/reduce + 0)
      (t/tesser (partition 100 stars)))
 ```
 
 Tesser goes much deeper, but this is the essence: writing understandable,
 composable, parallel programs for exploring datasets.
+
+## Installation
+
+Via Clojars, as usual.
+
+- [tesser.core](https://clojars.org/tesser.core) - The core library and
+  essential folds
+- [tesser.math](https://clojars.org/tesser.math) - Statistical folds: means,
+  correlations, covariance matrices, quantiles, etc.
+- [tesser.hadoop](https://clojars.org/tesser.hadoop) - Run folds on Hadoop.
+
+## API Docs
+
+- [tesser.core](http://aphyr.github.io/tesser/tesser.core.html)
+- [tesser.math](http://aphyr.github.io/tesser/tesser.math.html)
+- [tesser.hadoop](http://aphyr.github.io/tesser/tesser.hadoop.html)
 
 ## A Clojure Library for Concurrent & Commutative Folds
 
@@ -61,16 +77,6 @@ Tesser explores a different niche. It offers:
   stack-allocated, reducing GC load.
 - *Collection independence.* Like Transducers, Tesser folds are abstract
   transformations and can be re-used against varying types of collections.
-
-## Installation
-
-Via Clojars, as usual.
-
-- [tesser.core](https://clojars.org/tesser.core) - The core library and
-  essential folds
-- [tesser.math](https://clojars.org/tesser.math) - Statistical folds: means,
-  correlations, covariance matrices, quantiles, etc.
-- [tesser.hadoop](https://clojars.org/tesser.hadoop) - Run folds on Hadoop.
 
 ## Core
 
@@ -120,12 +126,11 @@ We can find the range of years *and* the total lines of code in each language
 in a single pass.
 
 ```clj
-(require '[tesser.math :as m])
 (->> (t/map #(json/parse-string % true))
      (t/fuse {:year-range (t/range (t/map :year))
               :total-code (->> (t/map :lines-of-code)
                                (t/facet)
-                               (m/sum))})
+                               (t/reduce + 0)})
      (t/tesser records))
 
 => {:year-range [1986 2014]
