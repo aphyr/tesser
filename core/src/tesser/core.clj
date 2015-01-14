@@ -35,7 +35,7 @@
       ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
-                            not-every? replace group-by])
+                            not-every? replace group-by reduce])
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
@@ -241,8 +241,8 @@
   [fold]
   (->> fold
        reverse
-       (reduce (fn [compiled build] (build compiled))
-               nil)
+       (core/reduce (fn [compiled build] (build compiled))
+                    nil)
        assert-compiled-fold))
 
 (defn tesser
@@ -272,8 +272,9 @@
                                  (when-let [seq (poll! queue)]
                                    ; Concurrent reduction
                                    (let [result (->> seq
-                                                     (reduce (:reducer fold)
-                                                             ((:identity fold)))
+                                                     (core/reduce
+                                                       (:reducer fold)
+                                                       ((:identity fold)))
                                                      ((:post-reducer fold)))]
 
                                      ; Sequential combine phase
@@ -395,7 +396,7 @@
   independently."
   [f]
   (assoc downstream :reducer (fn reducer [acc input]
-                               (reduce reducer- acc (f input)))))
+                               (core/reduce reducer- acc (f input)))))
 
 (deftransform keep
   "Takes a function `f` and an optional fold. Returns a version of the fold
@@ -537,7 +538,7 @@
                                                              acc))))))
 
    :combiner     (fn combiner [outer-acc reductions]
-                   (let [acc' (reduce (fn merger [acc [c2 x2]]
+                   (let [acc' (core/reduce (fn merger [acc [c2 x2]]
                                         (let [[c1 x1] acc]
                                           (if (= n c1)
                                             ; Done
@@ -561,6 +562,78 @@
                        acc')))
 
    :post-combiner (comp post-combiner- second)})
+
+(deftransform fold
+  "Like `reducers/fold`, turns a combiner and a reducer function into a fold.
+  Unlike `reducers/fold`, this `fold` doesn't take a collection: it just
+  returns a fold which can be applied to a collection via `tesser`. Why?  You
+  might want to compose the fold with something else using `fuse`, map it with
+  `post-combine`, etc etc.
+
+  Follows the clojure reducers and transducers conventions for arities:
+
+  - `(f)` returns a new identity element for the reduce/combine phase
+  - `(f acc input)` folds elements in the reduce/combine phases.
+  - `(f acc)` post-reduces/post-combines, unless `(f acc)` throws
+    clojure.lang.ArityException, in which case we return `acc` directly.
+
+  `tesser.core/fold` should be a straightforward replacement for
+  `clojure.core.reducers/fold`, except you'll do the chunking yourself:
+
+      (->> (t/fold set/union                ; combine via set union
+                   (fn ([] #{})             ; identity is empty set
+                       ([s x] (conj s x)))) ; conj into set
+           (t/tesser [[1 2 3] [4 5 6]]))
+      ; => #{1 4 6 3 2 5}"
+  [combinef reducef]
+  (assert (nil? downstream))
+  {:identity      reducef
+   :reducer       reducef
+   :post-reducer  (maybe-unary reducef)
+   :combiner      combinef
+   :post-combiner (maybe-unary combinef)})
+
+(deftransform reduce
+  "A fold that uses the same function for the reduce and combine phases. Unlike
+  normal Clojure reduce, this reduce doesn't take a collection: it just returns
+  a fold which can be applied to a collection via `tesser`. Why? You might want
+  to compose the reduction with something else using `fuse`, map it with
+  `post-combine`, etc etc.
+
+  Follows the clojure reducers and transducers conventions for arities:
+
+  - `(constantly init)` is used to generate identity elements.
+  - `(f acc input)` folds elements in the reduce and combine phases.
+  - `(f acc)` post-reduces and post-combines, unless `(f acc)` throws
+    clojure.lang.ArityException, in which case we return `acc` directly.
+
+  This means you can use probably `(reduce f init)` as a phase anywhere `f` is
+  associative and commutative.
+
+      (->> (t/map inc)
+           (t/reduce + 0)
+           (t/tesser [[1 2 3] [4 5 6]]))
+      ; => 27
+
+  Due to technical limitations Tesser can't distinguish between
+
+      (reduce + upstream-fold)
+
+  where we're transforming an uncompiled fold by adding a reduce phase, and
+
+      (reduce + 0)
+
+  where we're defining a new phase out of thin air with 0 as the initial value.
+  Consequently, we *always* interpret the second argument as an initial value.
+  We *don't* provide an equivalent for `(reduce +)` yet. Someday. Use `(fold +
+  +)` or `(reduce + (+))` instead."
+  [f init]
+  (assert (nil? downstream))
+  {:identity      (constantly init)
+   :reducer       f
+   :post-reducer  (maybe-unary f)
+   :combiner      f
+   :post-combiner (maybe-unary f)})
 
 (deftransform into
   "Adds all inputs to the given collection using conj. Ordering of elements
@@ -660,7 +733,7 @@
   {:identity      (constantly {})
    :reducer       (fn reducer [acc m]
                     ; Fold value m into accumulator map
-                    (reduce (fn [acc [k v]]
+                    (core/reduce (fn [acc [k v]]
                               ; Fold in each kv pair in m
                               (assoc acc k
                                      (reducer-

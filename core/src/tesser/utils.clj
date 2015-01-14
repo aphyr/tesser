@@ -210,3 +210,18 @@
            end
            (min (+ end n) total-size)
            (conj! out curr))))))))
+
+(defn maybe-unary
+  "Not all functions used in `tesser/fold` and `tesser/reduce` have a
+  single-arity form. This takes a function `f` and returns a fn `g` such that
+  `(g x)` is `(f x)` unless `(f x)` throws ArityException, in which case `(g
+  x)` returns just `x`."
+  [f]
+  (fn wrapper
+    ([] (f))
+    ([x] (try
+           (f x)
+           (catch clojure.lang.ArityException e
+             x)))
+    ([x y] (f x y))
+    ([x y & more] (apply f x y more))))

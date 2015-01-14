@@ -4,6 +4,7 @@
             [clojure.test.check [clojure-test :refer :all]
                                 [generators :as gen]
                                 [properties :as prop]]
+            [clojure.core.reducers :as r]
             [multiset.core :refer [multiset]]
             [tesser.utils :refer :all]
             [tesser.core :as t]))
@@ -103,6 +104,33 @@
                             flatten1
                             (remove odd?)
                             (into (multiset)))))))
+
+(defspec fold-spec
+  test-opts
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [reducef (fn ([] 0)
+                                  ([acc x] (+ acc x 1)))
+                      combinef +]
+
+                  (is (= (->> (t/map inc)
+                              (t/fold combinef reducef)
+                              (t/tesser chunks))
+                         (->> chunks
+                              flatten1
+                              (r/map inc)
+                              (r/fold combinef reducef)))))))
+
+(defspec reduce-spec
+;  test-opts
+  {:num-tests 1000}
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/map inc)
+                            (t/reduce + 0)
+                            (t/tesser chunks))
+                       (->> chunks
+                            flatten1
+                            (r/map inc)
+                            (reduce + 0))))))
 
 (defspec into-vec-spec
   test-opts
