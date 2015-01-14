@@ -1,5 +1,5 @@
 #!/bin/sh
-$dir=`pwd`
+dir=`pwd`
 
 cd $dir/core    && lein do clean, test, install, deploy clojars && \
 cd $dir/math    && lein do clean, test, install, deploy clojars && \

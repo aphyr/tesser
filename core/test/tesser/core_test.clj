@@ -121,8 +121,7 @@
                               (r/fold combinef reducef)))))))
 
 (defspec reduce-spec
-;  test-opts
-  {:num-tests 1000}
+  test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (is (= (->> (t/map inc)
                             (t/reduce + 0)
