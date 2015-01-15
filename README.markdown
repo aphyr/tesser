@@ -1,5 +1,11 @@
 # Tesser
 
+| API docs | Package | Purpose |
+|----------|---------|---------|
+| [tesser.core](http://aphyr.github.io/tesser/tesser.core.html) | [tesser.core](https://clojars.org/tesser.core) | The core library and essential folds |
+| [tesser.math](http://aphyr.github.io/tesser/tesser.math.html) | [tesser.math](https://clojars.org/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc. |
+| [tesser.hadoop](http://aphyr.github.io/tesser/tesser.hadoop.html) | [tesser.hadoop](https://clojars.org/tesser.hadoop) | Run folds on Hadoop via Parkour |
+
 > "Now we will tesser, we will wrinkle again. Do you understand?" "No,"
 > Meg said flatly. Mrs. Whatsit sighed. "Explanations are not easy when they
 > are about things for which your civilization still has no words. Calvin
@@ -42,22 +48,6 @@ You've got 48 cores in your desktop computer. Why aren't they all helping?
 
 Tesser goes much deeper, but this is the essence: writing understandable,
 composable, parallel programs for exploring datasets.
-
-## Installation
-
-Via Clojars, as usual.
-
-- [tesser.core](https://clojars.org/tesser.core) - The core library and
-  essential folds
-- [tesser.math](https://clojars.org/tesser.math) - Statistical folds: means,
-  correlations, covariance matrices, quantiles, etc.
-- [tesser.hadoop](https://clojars.org/tesser.hadoop) - Run folds on Hadoop.
-
-## API Docs
-
-- [tesser.core](http://aphyr.github.io/tesser/tesser.core.html)
-- [tesser.math](http://aphyr.github.io/tesser/tesser.math.html)
-- [tesser.hadoop](http://aphyr.github.io/tesser/tesser.hadoop.html)
 
 ## A Clojure Library for Concurrent & Commutative Folds
 
