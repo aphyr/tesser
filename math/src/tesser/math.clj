@@ -15,30 +15,32 @@
   "Finds the sum of numeric elements."
   []
   (assert (nil? downstream))
-  {:identity      (constantly 0)
-   :reducer       +
-   :post-reducer  identity
-   :combiner      +
-   :post-combiner identity})
+  {:reducer-identity (constantly 0)
+   :reducer           +
+   :post-reducer      identity
+   :combiner-identity (constantly 0)
+   :combiner          +
+   :post-combiner     identity})
 
 (deftransform mean
   "Finds the arithmetic mean of numeric inputs."
   []
   (assert (nil? downstream))
-  {:identity      (constantly [0 0])
-   :reducer       (fn reducer [[s c] x]
-                    [(+ s x) (inc c)])
-   :post-reducer  identity
-   :combiner      (fn combiner [x y] (core/map + x y))
-   :post-combiner (fn post-combiner [x]
-                    (double (/ (first x) (core/max 1 (last x)))))})
+  {:reducer-identity  (constantly [0 0])
+   :reducer           (fn reducer [[s c] x]
+                        [(+ s x) (inc c)])
+   :post-reducer      identity
+   :combiner-identity (constantly [0 0])
+   :combiner          (fn combiner [x y] (core/map + x y))
+   :post-combiner     (fn post-combiner [x]
+                        (double (/ (first x) (core/max 1 (last x)))))})
 
 (deftransform variance
   "Unbiased variance estimation. Given numeric inputs, returns their
   variance."
   []
   (assert (nil? downstream))
-  {:identity (constantly [0 0 0])
+  {:reducer-identity (constantly [0 0 0])
    :reducer (fn count-mean-sq [[count mean sum-of-squares] x]
               (let [count' (inc count)
                     mean'  (+ mean (/ (- x mean) count'))]
@@ -46,6 +48,7 @@
                  mean'
                  (+ sum-of-squares (* (- x mean') (- x mean)))]))
    :post-reducer identity
+   :combiner-identity (constantly [0 0 0])
    :combiner (fn partcmsq [[c m sq] [c2 m2 sq2]]
                (let [count (+ c c2)]
                  (if (zero? count)
@@ -69,7 +72,7 @@
   have both x and y, returns nil."
   [fx fy]
   (assert (nil? downstream))
-  {:identity (constantly [0 0 0 0])
+  {:reducer-identity (constantly [0 0 0 0])
    :reducer (fn count-mean2-sq [[count meanx meany sum-of-squares
                                  :as current-state] elt]
               (let [x (fx elt)
@@ -84,6 +87,7 @@
                      meany'
                      (+ sum-of-squares (* (- x meanx') (- y meany)))]))))
    :post-reducer identity
+   :combiner-identity (constantly [0 0 0 0])
    :combiner (fn partcm2sq [[c mx my sq :as current-state] [c2 mx2 my2 sq2]]
                (let [count (+ c c2)]
                  (if (zero? count)
@@ -138,48 +142,6 @@
                             :age         :age
                             :num-cats    (comp count :cats)})"
   [& args]
-  (apply fuse-matrix covariance args))(defn fuse-matrix
-  "Given:
-
-  1. A function like `covariance` that takes two functions of an input and
-     yields a fold, and
-  2. A map of key names to functions that extract values for
-     those keys from an input,
-
-  pairwise-matrix computes that fold over each *pair* of keys, returning a map
-  of name pairs to the result of that pairwise fold over the inputs. You can
-  think of this like an N^2 version of `fuse`."
-  [fold keymap & [downstream]]
-  (->> downstream
-       ; For this transform, map inputs to a temporary map of keys->values;
-       ; we'll be doing O(keys) lookups on each key, so having a flat map cuts
-       ; down on having to re-run expensive extractor functions.
-       (t/map (fn project [input]
-              (->> keymap
-                   (core/reduce-kv (fn extract [m k extractor]
-                                     (assoc! m k (extractor input)))
-                                   (transient {}))
-                   persistent!)))
-
-       ; And pass those maps into a fused covariance transform
-       (t/fuse (->> (combo/combinations (core/keys keymap) 2)
-                  ; Turn pairs into [pair, covariance-fold]
-                  (core/map (fn [[k1 k2]]
-                              [[k1 k2] (fold #(get % k1) #(get % k2))]))
-                  (core/into {})))
-
-       ; And return both halves of the resulting triangular matrix
-       (t/post-combine complete-triangular-matrix)))
-
-(defn covariance-matrix
-  "Given a map of key names to functions that extract values for those keys
-  from an input, computes the covariance for each of the n^2 key pairs,
-  returning a map of name pairs to the their covariance. For example:
-
-      (t/covariance-matrix {:name-length #(.length (:name %))
-                            :age         :age
-                            :num-cats    (comp count :cats)})"
-  [& args]
   (apply fuse-matrix covariance args))
 
 (deftransform correlation+count
@@ -195,7 +157,7 @@
 
   which is useful for significance testing."
   [fx fy]
-  {:identity (constantly [0 0 0 0 0 0])
+  {:reducer-identity (constantly [0 0 0 0 0 0])
    :reducer (->> (fn count-m2-sq3 [[count meanx meany ssx ssy ssxy :as acc] elt]
                    (let [x (fx elt)
                          y (fy elt)]
@@ -211,6 +173,7 @@
                           (+ ssy (* (- y meany') (- y meany)))
                           (+ ssxy (* (- x meanx') (- y meany)))])))))
    :post-reducer identity
+   :combiner-identity (constantly [0 0 0 0 0 0])
    :combiner (fn partcm2sq3 [[c  mx  my  ssx  ssy ssxy]
                              [c2 mx2 my2 ssx2 ssy2 ssxy2]]
                (let [count (+ c c2)]
@@ -329,8 +292,9 @@
   defaults for you."
   [digest-generator]
   (assert (nil? downstream))
-  {:identity      digest-generator
-   :reducer       q/add-point!
-   :post-reducer  identity
-   :combiner      q/merge-digest!
-   :post-combiner identity})
+  {:reducer-identity    digest-generator
+   :reducer             q/add-point!
+   :post-reducer        identity
+   :combiner-identity   digest-generator
+   :combiner            q/merge-digest!
+   :post-combiner       identity})

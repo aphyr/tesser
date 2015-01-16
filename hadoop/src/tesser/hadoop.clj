@@ -113,7 +113,7 @@
                              (red acc line)
                              (catch Exception e
                                (reduced (serialize-error acc line e)))))
-                         ((:identity fold))
+                         ((:reducer-identity fold))
                          input)))
              (catch Exception e
                (serialize-error nil nil e)))))
@@ -133,7 +133,7 @@
                                           (combiner acc x))
                                         (catch Exception e
                                           (reduced (serialize-error acc x e)))))
-                                    ((:identity fold))
+                                    ((:combiner-identity fold))
                                     input)]
                (if (error? combined)
                  combined

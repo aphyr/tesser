@@ -222,10 +222,13 @@
 (defn assert-compiled-fold
   "Is this a valid compiled fold?"
   [f]
-  (assert (fn? (:identity f)) (str (pr-str f) " is missing an :identity fn"))
+  (assert (fn? (:reducer-identity f))
+          (str (pr-str f) " is missing a :reducer-identity fn"))
   (assert (fn? (:reducer f))  (str (pr-str f) " is missing a :reducer fn"))
   (assert (fn? (:post-reducer f))
           (str (pr-str f) " is missing a :post-reducer fn"))
+  (assert (fn? (:combiner-identity f))
+          (str (pr-str f) " is missing a :combiner-identity fn"))
   (assert (fn? (:combiner f)) (str (pr-str f) " is missing a :combiner fn"))
   (assert (fn? (:post-combiner f))
           (str (pr-str f) " is missing a :post-combiner fn"))
@@ -235,8 +238,8 @@
   "Compiles a fold (a sequence of transforms, each represented as a function
   taking the next transform) to a single map like
 
-      {:identity (fn [] ...),
-       :reducer  (fn [acc x] ...)
+      {:reducer-identity  (fn [] ...),
+       :reducer           (fn [acc x] ...)
        ...}"
   [fold]
   (->> fold
@@ -259,34 +262,35 @@
                    (if (reduced? combined)
                      combined
                      ((:combiner fold) combined x)))
-        combined (atom ((:identity fold)))
+        combined (atom ((:combiner-identity fold)))
         chunks   (atom 0)]
 ;        stats    (measure/periodically 1 (println @chunks "chunks processed"))]
     (try
-      (let [workers (->> threads
-                         core/range
-                         (core/map
-                           (fn worker [i]
-                             (future
-                               (while
-                                 (when-let [seq (poll! queue)]
-                                   ; Concurrent reduction
-                                   (let [result (->> seq
-                                                     (core/reduce
-                                                       (:reducer fold)
-                                                       ((:identity fold)))
-                                                     ((:post-reducer fold)))]
+      (let [workers
+            (->> threads
+                 core/range
+                 (core/map
+                   (fn worker [i]
+                     (future
+                       (while
+                         (when-let [seq (poll! queue)]
+                           ; Concurrent reduction
+                           (let [result (->> seq
+                                             (core/reduce
+                                               (:reducer fold)
+                                               ((:reducer-identity fold)))
+                                             ((:post-reducer fold)))]
 
-                                     ; Sequential combine phase
-                                     (let [combined'
-                                           (locking combined
-                                             (swap! combined combiner result))]
+                             ; Sequential combine phase
+                             (let [combined'
+                                   (locking combined
+                                     (swap! combined combiner result))]
 
-                                         ; Update stats
-;                                         (swap! chunks inc)
+                               ; Update stats
+                               ; (swap! chunks inc)
 
-                                         ; Abort early if reduced.
-                                         (not (reduced? combined'))))))))))]
+                               ; Abort early if reduced.
+                               (not (reduced? combined'))))))))))]
         (try
           ; Wait for workers
           (core/mapv deref workers)
@@ -337,10 +341,10 @@
   the transform, the append/prepend logic, the annealing function and its
   destructuring bind, etc. We'll wrap these up in an anaphoric macro called
   `deftransform`, which takes a function (e.g. `append`) to conjoin this
-  transform with the fold. Within the body, `identity-`, `reducer-`,
-  `post-reducer-`, `combiner-`, `post-combiner-` are all bound to the
-  downstream transform's component functions, and `downstream` is bound to the
-  downstream transform itself."
+  transform with the fold. Within the body, `reducer-identity-`, `reducer-`,
+  `post-reducer-`, `combiner-identity-`, `combiner-`, `post-combiner-` are all
+  bound to the downstream transform's component functions, and `downstream` is
+  bound to the downstream transform itself."
   [conjoiner name docstring args & body]
   `(defn ~name ~docstring
      ; Version without fold argument
@@ -349,11 +353,12 @@
      ([~@args fold#]
       (~conjoiner fold#
                   (fn build [~'downstream]
-                    (let ~'[identity-      (:identity downstream)
-                            reducer-       (:reducer downstream)
-                            post-reducer-  (:post-reducer downstream)
-                            combiner-      (:combiner downstream)
-                            post-combiner- (:post-combiner downstream)]
+                    (let ~'[reducer-identity-   (:reducer-identity downstream)
+                            reducer-            (:reducer downstream)
+                            post-reducer-       (:post-reducer downstream)
+                            combiner-identity-  (:combiner-identity downstream)
+                            combiner-           (:combiner downstream)
+                            post-combiner-      (:post-combiner downstream)]
                       ~@body))))))
 
 (defmacro deftransform
@@ -512,7 +517,7 @@
   ; largest-to-smallest order.
   [n]
   (assert (not (neg? n)))
-  {:identity      (fn identity [] (list 0 (identity-)))
+  {:reducer-identity (fn reducer-identity [] (list 0 (reducer-identity-)))
 
    :reducer       (fn reducer [[c acc & finished :as reductions] input]
                     ; TODO: limit to n
@@ -524,7 +529,8 @@
                         (if (<= limit c)
                           ; We've filled this chunk; proceed to the next.
                           (scred reducer-
-                                 (cons 1 (cons (reducer- (identity-) input)
+                                 (cons 1 (cons (reducer- (reducer-identity-)
+                                                         input)
                                                reductions)))
                           ; Chunk ain't full yet; keep going.
                           (scred reducer-
@@ -536,6 +542,8 @@
                         (partition 2)
                         (core/mapcat (fn [[n acc]] (list n (post-reducer-
                                                              acc))))))
+
+   :combiner-identity (fn combiner-identity [] (list 0 (combiner-identity-)))
 
    :combiner     (fn combiner [outer-acc reductions]
                    (let [acc' (core/reduce (fn merger [acc [c2 x2]]
@@ -587,11 +595,12 @@
       ; => #{1 4 6 3 2 5}"
   [combinef reducef]
   (assert (nil? downstream))
-  {:identity      reducef
-   :reducer       reducef
-   :post-reducer  (maybe-unary reducef)
-   :combiner      combinef
-   :post-combiner (maybe-unary combinef)})
+  {:reducer-identity  reducef
+   :reducer           reducef
+   :post-reducer      (maybe-unary reducef)
+   :combiner-identity combinef
+   :combiner          combinef
+   :post-combiner     (maybe-unary combinef)})
 
 (deftransform reduce
   "A fold that uses the same function for the reduce and combine phases. Unlike
@@ -629,27 +638,24 @@
   +)` or `(reduce + (+))` instead."
   [f init]
   (assert (nil? downstream))
-  {:identity      (constantly init)
-   :reducer       f
-   :post-reducer  (maybe-unary f)
-   :combiner      f
-   :post-combiner (maybe-unary f)})
+  {:reducer-identity  (constantly init)
+   :reducer           f
+   :post-reducer      (maybe-unary f)
+   :combiner-identity (constantly init)
+   :combiner          f
+   :post-combiner     (maybe-unary f)})
 
 (deftransform into
   "Adds all inputs to the given collection using conj. Ordering of elements
-  from distinct chunks is undefined.
-
-  TODO: distinct identities for reducer and combiner would allow us to conj
-  into (empty coll) in reducer, then start with coll for combine. Doesn't
-  really save much for injective collections, but for sets/maps could be more
-  efficient."
+  from distinct chunks is undefined."
   [coll]
   (assert (nil? downstream))
-  {:identity      vector
-   :reducer       conj
-   :post-reducer  identity
-   :combiner      core/concat
-   :post-combiner (partial core/into coll)})
+  {:reducer-identity vector
+   :reducer          conj
+   :post-reducer     identity
+   :combiner-identity vector
+   :combiner          core/concat
+   :post-combiner     (partial core/into coll)})
 
 (defwraptransform post-combine
   "Transforms the output of a fold by applying a function to it.
@@ -694,15 +700,17 @@
                        {:name :down,     :type :quark,  :mass 3.5}]]))
       ; => {:lepton 105.65, :quark 3.5}"
   [category-fn]
-  {:identity        (constantly {})
+  {:reducer-identity hash-map
    :reducer         (fn reducer [acc input]
                       (let [category (category-fn input)]
                         (assoc acc category
                                (reducer-
                                  ; TODO: invoke downstream identity only when
                                  ; necessary.
-                                 (get acc category (identity-)) input))))
+                                 (get acc category (reducer-identity-))
+                                 input))))
    :post-reducer    identity
+   :combiner-identity hash-map
    :combiner        (fn combiner [m1 m2]
                       (merge-with combiner- m1 m2))
    :post-combiner   (fn post-combiner [m]
@@ -730,7 +738,7 @@
 
       {:x 1, :y 2, :z 4}"
   []
-  {:identity      (constantly {})
+  {:reducer-identity hash-map
    :reducer       (fn reducer [acc m]
                     ; Fold value m into accumulator map
                     (core/reduce (fn [acc [k v]]
@@ -739,14 +747,15 @@
                                      (reducer-
                                        ; TODO: only invoke downstream identity
                                        ; when necessary
-                                       (get acc k (identity-)) v)))
+                                       (get acc k (reducer-identity-)) v)))
                             acc
                             m))
-   :post-reducer  identity
-   :combiner      (fn combiner [m1 m2]
-                    (merge-with combiner- m1 m2))
-   :post-combiner (fn post-combiner [m]
-                    (map-vals post-combiner- m))})
+   :post-reducer      identity
+   :combiner-identity hash-map
+   :combiner          (fn combiner [m1 m2]
+                        (merge-with combiner- m1 m2))
+   :post-combiner     (fn post-combiner [m]
+                        (map-vals post-combiner- m))})
 
 (deftransform fuse
   "You've got several folds, and want to execute them in one pass. Fuse is the
@@ -788,16 +797,19 @@
         combiners      (core/map :combiner folds)]
     ; We're gonna project into a particular key basis vector for the
     ; reduce/combine steps
-    {:identity      (if (core/empty? fold-map)
-                       (constantly []) ; juxt can't take zero args
-                       (apply juxt (core/map :identity folds)))
-      :reducer       (fn reducer [accs x]
-                       (mapv (fn [f acc] (f acc x))
-                             reducers accs))
-      :post-reducer  identity
-      :combiner      (fn combiner [accs1 accs2]
-                       (mapv (fn [f acc1 acc2] (f acc1 acc2))
-                             combiners accs1 accs2))
+    {:reducer-identity    (if (core/empty? fold-map)
+                            vector
+                            (apply juxt (core/map :reducer-identity folds)))
+     :reducer             (fn reducer [accs x]
+                            (mapv (fn [f acc] (f acc x))
+                                  reducers accs))
+     :post-reducer        identity
+     :combiner-identity   (if (core/empty? fold-map)
+                            vector
+                            (apply juxt (core/map :combiner-identity folds)))
+     :combiner            (fn combiner [accs1 accs2]
+                            (mapv (fn [f acc1 acc2] (f acc1 acc2))
+                                  combiners accs1 accs2))
      ; Then inflate the vector back into a map
      :post-combiner (comp (partial zipmap ks)
                           ; After having applied the post-combiners
@@ -812,33 +824,36 @@
   "How many inputs are there?"
   []
   (assert (nil? downstream))
-  {:identity (constantly 0)
-   :reducer  (fn reducer [c _] (inc c))
-   :post-reducer identity
-   :combiner +
-   :post-combiner identity})
+  {:reducer-identity  (constantly 0)
+   :reducer           (fn reducer [c _] (inc c))
+   :post-reducer      identity
+   :combiner-identity (constantly 0)
+   :combiner          +
+   :post-combiner     identity})
 
 (deftransform set
   "A hash-set of distinct inputs."
   []
   (assert (nil? downstream))
-  {:identity      (constantly #{})
-   :reducer       conj
-   :post-reducer  identity
-   :combiner      set/union
-   :post-combiner identity})
+  {:reducer-identity      hash-set
+   :reducer               conj
+   :post-reducer          identity
+   :combiner-identity     hash-set
+   :combiner              set/union
+   :post-combiner         identity})
 
 (deftransform frequencies
   "Like clojure.core/frequencies, returns a map of inputs to the number of
   times those inputs appeared in the collection."
   []
   (assert (nil? downstream))
-  {:identity hash-map
-   :reducer  (fn add [freqs x]
-               (assoc freqs x (inc (get freqs x 0))))
-   :post-reducer identity
-   :combiner (partial merge-with +)
-   :post-combiner identity})
+  {:reducer-identity  hash-map
+   :reducer           (fn add [freqs x]
+                        (assoc freqs x (inc (get freqs x 0))))
+   :post-reducer      identity
+   :combiner-identity hash-map
+   :combiner          (partial merge-with +)
+   :post-combiner     identity})
 
 (deftransform some
   "Returns the first logical true value of (pred input). If no such satisfying
@@ -854,21 +869,23 @@
       ; => 1"
   [pred]
   (assert (nil? downstream))
-  {:identity      (constantly nil)
-   :reducer       (fn reducer [_ x] (when-let [v (pred x)] (reduced v)))
-   :post-reducer  identity
-   :combiner      first-non-nil-reducer
-   :post-combiner identity})
+  {:reducer-identity      (constantly nil)
+   :reducer               (fn reducer [_ x] (when-let [v (pred x)] (reduced v)))
+   :post-reducer          identity
+   :combiner-identity     (constantly nil)
+   :combiner              first-non-nil-reducer
+   :post-combiner         identity})
 
 (deftransform any
   "Returns any single input from the collection. O(chunks)."
   []
   (assert (nil? downstream))
-  {:identity      (constantly nil)
-   :reducer       first-non-nil-reducer
-   :post-reducer  identity
-   :combiner      first-non-nil-reducer
-   :post-combiner identity})
+  {:reducer-identity      (constantly nil)
+   :reducer               first-non-nil-reducer
+   :post-reducer          identity
+   :combiner-identity     (constantly nil)
+   :combiner              first-non-nil-reducer
+   :post-combiner         identity})
 
 ;; Predicate folds
 
@@ -919,11 +936,12 @@
                   (nil? x)             m
                   (<= 0 (compare x m)) x
                   true                 m))]
-    {:identity      (constantly nil)
-     :reducer       extremum-reducer
-     :post-reducer  identity
-     :combiner      extremum-reducer
-     :post-combiner identity}))
+    {:reducer-identity  (constantly nil)
+     :reducer           extremum-reducer
+     :post-reducer      identity
+     :combiner-identity (constantly nil)
+     :combiner          extremum-reducer
+     :post-combiner     identity}))
 
 (defn min
   "Finds the smallest value using `compare`."
