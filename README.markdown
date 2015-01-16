@@ -1,10 +1,10 @@
-# Tesser
-
 | API docs | Package | Purpose |
 |----------|---------|---------|
 | [tesser.core](http://aphyr.github.io/tesser/tesser.core.html) | [tesser.core](https://clojars.org/tesser.core) | The core library and essential folds |
 | [tesser.math](http://aphyr.github.io/tesser/tesser.math.html) | [tesser.math](https://clojars.org/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc. |
 | [tesser.hadoop](http://aphyr.github.io/tesser/tesser.hadoop.html) | [tesser.hadoop](https://clojars.org/tesser.hadoop) | Run folds on Hadoop via Parkour |
+
+# Tesser
 
 > "Now we will tesser, we will wrinkle again. Do you understand?" "No,"
 > Meg said flatly. Mrs. Whatsit sighed. "Explanations are not easy when they
@@ -54,10 +54,12 @@ composable, *fast* programs for exploring datasets.
 Tesser gives us a library for building up *folds*, and applying those folds to
 a collection of *inputs*, divided into *chunks*. Chunks are reduced with
 maximal parallelism, and the results of those reductions are reduced together.
-Though both passes are singlethreaded reductions, we call the concurrent phase
-"reduce", and the serial phase "combine".
+We call the concurrent reduction `:reducer`, and the serial reduction
+`:combiner`.
 
 ![Reduce/Combine diagram](/img/reduce-combine.jpg)
+
+In order to reduce over each chunk, we need an *initial value*
 
 ## Core
 
@@ -91,8 +93,6 @@ Fold combinators like
 [fuse](http://aphyr.github.io/tesser/tesser.core.html#var-fuse) allow multiple
 reductions to be done in a single pass, possibly sharing expensive operations
 like deserialization. This is a particularly effective way of working with a
-  (:import (com.clearspring.analytics.stream.quantile QDigest)
-           (com.tdunning.math.stats AVLTreeDigest))
 set of data files on disk or in Hadoop.
 
 Given JSON records about a codebase like
