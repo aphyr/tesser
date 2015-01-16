@@ -57,7 +57,7 @@ maximal parallelism, and the results of those reductions are reduced together.
 Though both passes are singlethreaded reductions, we call the concurrent phase
 "reduce", and the serial phase "combine".
 
-![Reduce/Combine diagram](/aphyr/tesser/blob/master/img/reduce-combine.jpg)
+![Reduce/Combine diagram](/img/reduce-combine.jpg)
 
 ## Core
 
