@@ -57,9 +57,21 @@ maximal parallelism, and the results of those reductions are reduced together.
 We call the concurrent reduction `:reducer`, and the serial reduction
 `:combiner`.
 
-![Reduce/Combine diagram](/img/reduce-combine.jpg)
+![Reduce/combine diagram](/img/reduce-combine.jpg)
 
-In order to reduce over each chunk, we need an *initial value*
+In order to reduce over a chunk, we need an *initial value*. A
+`:reducer-identity` function generates this initial value. Once the reduction
+is complete, we may want to transform it using a `:post-reducer` function--for
+instance, converting from a transient to a persistent data structure, or
+discarding internal reducer state.
+
+![Diagram of reducer identities and post-reduce](/img/reducer-identity-post.jpg)
+
+Likewise, we need a `:combiner-identity` function to generate an initial value
+for the combine reduction, and a final `:post-combine` function to transform
+the combiner's output.
+
+![Diagram of combiner identity and post-combine](/img/combiner-identity-post.jpg)
 
 ## Core
 
