@@ -32,6 +32,64 @@
 
 ;; Tests
 
+(defspec fold-full-spec
+  test-opts
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/filter even?)
+                            (t/fold {:reducer-identity  vector
+                                     :reducer           conj
+                                     :post-reducer      (comp vec rseq)
+                                     :combiner-identity sorted-set
+                                     :combiner          conj
+                                     :post-combiner     reverse})
+                            (t/tesser chunks))
+                       (->> chunks
+                            (map (fn [chunk]
+                                   (->> chunk
+                                        (filter even?)
+                                        (into [])
+                                        rseq
+                                        vec)))
+                            (into (sorted-set))
+                            reverse)))))
+
+(defspec fold-reducer-spec
+  test-opts
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/fold {:identity hash-set
+                                     :reducer  conj
+                                     :combiner into})
+                            (t/tesser chunks))
+                       (->> chunks flatten1 set)))))
+
+
+(defspec fold-fn-spec
+  test-opts
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/fold +)
+                            (t/tesser chunks))
+                       (->> chunks flatten1 (reduce +))))))
+
+(defspec transform-spec
+  {:test-count 1000
+   :par        1}
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/transform #(assoc % :combiner-identity
+                                                 (constantly #{:hi})))
+                            (t/set)
+                            (t/tesser chunks))
+                       (->> chunks flatten1 (cons :hi) set)))))
+
+(defspec wrap-transform-spec
+  {:test-count 1000
+   :par        1}
+  (prop/for-all [chunks (chunks gen/int)]
+                (is (= (->> (t/set)
+                            (t/wrap-transform #(assoc % :combiner-identity
+                                                      (constantly #{:hi})))
+                            (t/tesser chunks))
+                       (->> chunks flatten1 (cons :hi) set)))))
+
 (defspec map-spec
   test-opts
   (prop/for-all [chunks (chunks gen/int)]
@@ -104,21 +162,6 @@
                             flatten1
                             (remove odd?)
                             (into (multiset)))))))
-
-(defspec fold-spec
-  test-opts
-  (prop/for-all [chunks (chunks gen/int)]
-                (let [reducef (fn ([] 0)
-                                  ([acc x] (+ acc x 1)))
-                      combinef +]
-
-                  (is (= (->> (t/map inc)
-                              (t/fold combinef reducef)
-                              (t/tesser chunks))
-                         (->> chunks
-                              flatten1
-                              (r/map inc)
-                              (r/fold combinef reducef)))))))
 
 (defspec reduce-spec
   test-opts

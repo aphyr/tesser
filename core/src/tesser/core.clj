@@ -572,35 +572,74 @@
    :post-combiner (comp post-combiner- second)})
 
 (deftransform fold
-  "Like `reducers/fold`, turns a combiner and a reducer function into a fold.
-  Unlike `reducers/fold`, this `fold` doesn't take a collection: it just
-  returns a fold which can be applied to a collection via `tesser`. Why?  You
-  might want to compose the fold with something else using `fuse`, map it with
-  `post-combine`, etc etc.
+  "An arbitrary terminal fold. Takes a compiled fold and yields an uncompiled
+  fold that can be composed with the usual Tesser transforms (`map`, `filter`,
+  etc), or passed directly to `tesser`. For instance, a sum of numbers:
 
-  Follows the clojure reducers and transducers conventions for arities:
+  (->> (t/fold {:reducer-identity  (constantly 0)
+                :reducer           +
+                :post-reducer      identity
+                :combiner-identity (constantly 0)
+                :combiner          +
+                :post-combiner     identity})
+       (t/tesser [[5 6 7] [] [8]]))
+  ; => 26
 
-  - `(f)` returns a new identity element for the reduce/combine phase
-  - `(f acc input)` folds elements in the reduce/combine phases.
-  - `(f acc)` post-reduces/post-combines, unless `(f acc)` throws
-    clojure.lang.ArityException, in which case we return `acc` directly.
+  Fold has several shortcuts to make defining folds more concise:
 
-  `tesser.core/fold` should be a straightforward replacement for
-  `clojure.core.reducers/fold`, except you'll do the chunking yourself:
+  - `:reducer`: if `m` is a function, not a map, defaults to `m`.
+  - `:combiner`: defaults to `:reducer`
+  - `:reducer-identity`: defaults to `:identity`, or else `:reducer`
+  - `:combiner-identity`: defaults to `:identity`, or else `:combiner`
+  - `:post-reducer`: defaults to `:reducer`, or `identity` if `:reducer` has no
+    unary arity.
+  - `:post-combiner` defaults to `:combiner`, or `identity` if `:combiner` has
+    no unary arity.
 
-      (->> (t/fold set/union                ; combine via set union
-                   (fn ([] #{})             ; identity is empty set
-                       ([s x] (conj s x)))) ; conj into set
-           (t/tesser [[1 2 3] [4 5 6]]))
-      ; => #{1 4 6 3 2 5}"
-  [combinef reducef]
+  So we can find a sorted set of all inputs using:
+
+  (->> (t/fold {:identity sorted-set
+                :reducer conj
+                :combiner into})
+       (t/tesser [[1 2] [2 3]]))
+  ; => #{1 2 3}
+
+  And if we provide a function instead of a map, Tesser interprets it using the
+  transducer-style arities: `(m)` for identity, `(m acc)` for
+  post-reducer/post-combiner, `(m acc input)` for reducer/combiner, etc.
+
+  (t/tesser [[1 2 3] [4 5 6]] (t/fold +))
+  ; => 21"
+  [m]
   (assert (nil? downstream))
-  {:reducer-identity  reducef
-   :reducer           reducef
-   :post-reducer      (maybe-unary reducef)
-   :combiner-identity combinef
-   :combiner          combinef
-   :post-combiner     (maybe-unary combinef)})
+  (let [reducer             (or (:reducer m) m)
+        combiner            (or (:combiner m) reducer)
+        reducer-identity    (or (:reducer-identity m) (:identity m) reducer)
+        combiner-identity   (or (:combiner-identity m) (:identity m) combiner)
+        post-reducer        (or (:post-reducer m) (maybe-unary reducer))
+        post-combiner       (or (:post-combiner m) (maybe-unary combiner))]
+    {:reducer-identity  reducer-identity
+     :reducer           reducer
+     :post-reducer      post-reducer
+     :combiner-identity combiner-identity
+     :combiner          combiner
+     :post-combiner     post-combiner}))
+
+(deftransform transform
+  "An arbitrary transform. Takes a function that maps one compiled fold map to
+  another, and an optional uncompiled fold, and returns an uncompiled fold with
+  that transformation applied innermost; e.g. it controls inputs *last*, and
+  post-processes outputs *first*."
+  [f]
+  (f downstream))
+
+(defwraptransform wrap-transform
+  "An arbitrary transform. Takes a function that maps one compiled fold map to
+  another, and an optional uncompiled fold, and returns an uncompiled fold with
+  that transformation applied outermost; e.g. it controls inputs *first*, and
+  post-processes outputs *last*."
+  [f]
+  (f downstream))
 
 (deftransform reduce
   "A fold that uses the same function for the reduce and combine phases. Unlike
