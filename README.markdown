@@ -19,10 +19,10 @@
 ## A Motivating Example
 
 You've got a big pile of data--say, JSON in files on disk, or TSVs in
-Hadoop--and you'd like to reduce over that data, computing some small
-statistics efficiently. You might want to find the median housing price in each
-city given a collection of all sales, or find the total mass of all
-main-sequence stars in a region of sky, or search for an anticorrelation
+Hadoop--and you'd like to reduce over that data: computing some statistics,
+searching for special values, etc. You might want to find the median housing
+price in each city given a collection of all sales, or find the total mass of
+all main-sequence stars in a region of sky, or search for an anticorrelation
 between vaccine use and the prevalence of a disease. These are all *folds*:
 collapsing a collection of data into a smaller value.
 
@@ -32,7 +32,7 @@ In Clojure, we're used to writing programs like
 (->> stars
      (filter main-sequence?)
      (map :mass)
-     (reduce + 0))
+     (reduce +))
 ```
 
 But this reduction is *singlethreaded*, and can only run on a single machine.
@@ -42,31 +42,22 @@ You've got 48 cores in your desktop computer. Why aren't they all helping?
 (require '[tesser.core :as t])
 (->> (t/filter main-sequence)
      (t/map :mass)
-     (t/reduce + 0)
+     (t/fold +)
      (t/tesser (partition 100 stars)))
 ```
 
 Tesser goes much deeper, but this is the essence: writing understandable,
-composable, parallel programs for exploring datasets.
+composable, *fast* programs for exploring datasets.
 
 ## A Clojure Library for Concurrent & Commutative Folds
 
-Clojure's reducers and transducers embody sequential folds: they move from left
-to right over a sequence. Reducers also includes a less-well-known
-*hierarchical* fold which parallelizes a reduction via Java's fork-join pool,
-but this reduction is still fundamentally ordered and local to a single
-machine.
+Tesser gives us a library for building up *folds*, and applying those folds to
+a collection of *inputs*, divided into *chunks*. Chunks are reduced with
+maximal parallelism, and the results of those reductions are reduced together.
+Though both passes are singlethreaded reductions, we call the concurrent phase
+"reduce", and the serial phase "combine".
 
-Tesser explores a different niche. It offers:
-
-- *Commutativity.* Tesser folds must not depend on the order of inputs.
-- *Concurrency.* Reductions over independent chunks require no coordination,
-  making them good candidates for distributed contexts like Hadoop.
-- *Stream fusion.* Like Reducers and Transducers, `map`, `filter`, etc. are all
-  folded into a single reduction function. Intermediate values are
-  stack-allocated, reducing GC load.
-- *Collection independence.* Like Transducers, Tesser folds are abstract
-  transformations and can be re-used against varying types of collections.
+![Reduce/Combine diagram](/aphyr/tesser/blob/master/img/reduce-combine.jpg)
 
 ## Core
 
@@ -279,6 +270,25 @@ can write small tests to verify each folds behavior indepedently, then compose
 them into larger programs. We're free to name transformations at any level just
 by binding them to `let` variables or `defn`s, or to build complex folds in a
 single pass.
+
+## Vs Reducers and Transducers
+
+Clojure's reducers and transducers embody sequential folds: they move from left
+to right over a sequence. Reducers also includes a less-well-known
+*hierarchical* fold which parallelizes a reduction via Java's fork-join pool,
+but this reduction is still fundamentally ordered and local to a single
+machine.
+
+Tesser explores a different niche. It offers:
+
+- *Commutativity.* Tesser folds must not depend on the order of inputs.
+- *Concurrency.* Reductions over independent chunks require no coordination,
+  making them good candidates for distributed contexts like Hadoop.
+- *Stream fusion.* Like Reducers and Transducers, `map`, `filter`, etc. are all
+  folded into a single reduction function. Intermediate values are
+  stack-allocated, reducing GC load.
+- *Collection independence.* Like Transducers, Tesser folds are abstract
+  transformations and can be re-used against varying types of collections.
 
 ## Contributors
 
