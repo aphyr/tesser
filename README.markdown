@@ -1,4 +1,4 @@
-| API docs | Package | Purpose |
+| API docs | Clojars | Purpose |
 |----------|---------|---------|
 | [tesser.core](http://aphyr.github.io/tesser/tesser.core.html) | [tesser.core](https://clojars.org/tesser.core) | The core library and essential folds |
 | [tesser.math](http://aphyr.github.io/tesser/tesser.math.html) | [tesser.math](https://clojars.org/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc. |
@@ -318,7 +318,7 @@ simple invariants.
   in a lexical closure, for instance.
 - Accumulators may be mutable, and folds never modify the same accumulator
   concurrently. You may mutate the accumulator in a reducer, combiner, or
-  post-fn withot synchronization.
+  post-fn without synchronization.
 - Reducers and combiners must be associative: `(f a (f b c))` = `(f (f a b)
   c)`.
 - Reducers and combiners must be commutative: `(f a b)` = `(f b a)`.
