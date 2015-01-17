@@ -73,6 +73,31 @@ the combiner's output.
 
 ![Diagram of combiner identity and post-combine](/img/combiner-identity-post.jpg)
 
+So a fold is simply a map of six functions.
+
+```clj
+{:reducer-identity  (fn [] ...)
+ :reducer           (fn [accumulator input] ...)
+ :post-reducer      (fn [accumulator] ...)
+ :combiner-identity (fn [] ...)
+ :combiner          (fn [accumulator post-reducer-result])
+ :post-combiner     (fn [accumulator] ...)}
+```
+
+For instance, here's a fold to find the sum of all inputs. While the reducer
+and combiner often have the same accumulator type and identities,
+this is not always the case.
+
+```clj
+  {:reducer-identity  (constantly 0)
+   :reducer           +
+   :post-reducer      identity
+   :combiner-identity (constantly 0)
+   :combiner          +
+   :post-combiner     identity
+```
+
+
 ## Core
 
 [Tesser.core](http://aphyr.github.io/tesser/tesser.core.html) looks a lot like
@@ -282,6 +307,25 @@ can write small tests to verify each folds behavior indepedently, then compose
 them into larger programs. We're free to name transformations at any level just
 by binding them to `let` variables or `defn`s, or to build complex folds in a
 single pass.
+
+## Invariants
+
+In order for Tesser to execute a fold concurrently, a fold must obey some
+simple invariants.
+
+- All functions should be deterministic functions purely of their inputs.
+  Constructing two copies of the same fold on, say, different nodes in a
+  cluster should result in equivalent behavior. You *cannot* squirrel away state
+  in a lexical closure, for instance.
+- Accumulators may be mutable, and folds never modify the same accumulator
+  concurrently. You may mutate the accumulator in a reducer, combiner, or
+  post-fn withot synchronization.
+- Reducers and combiners must be associative: `(f a (f b c))` = `(f (f a b)
+  c)`.
+- Reducers and combiners must be commutative: `(f a b)` = `(f b a)`.
+- Reducers and combiners may emit `reduced` values, which force immediate
+  completion of that particular reduce or combine. If a reducer emits a reduced
+  value, it has no impact on the execution of other reducers, or the combiner.
 
 ## Vs Reducers and Transducers
 
