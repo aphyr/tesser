@@ -73,7 +73,7 @@ the combiner's output.
 
 ![Diagram of combiner identity and post-combine](/img/combiner-identity-post.jpg)
 
-So a fold is simply a map of six functions.
+In Tesser, we represent a compiled fold as map of six functions:
 
 ```clj
 {:reducer-identity  (fn [] ...)
@@ -94,9 +94,8 @@ this is not always the case.
    :post-reducer      identity
    :combiner-identity (constantly 0)
    :combiner          +
-   :post-combiner     identity
+   :post-combiner     identity}
 ```
-
 
 ## Core
 
