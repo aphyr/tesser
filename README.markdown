@@ -73,6 +73,19 @@ the combiner's output.
 
 ![Diagram of combiner identity and post-combine](/img/combiner-identity-post.jpg)
 
+Tesser folds are *associative* and *commutative* monoids: they can be applied
+concurrently and do not preserve order. We make this tradeoff to reduce the
+need for coordination between reducers. Not all concurrent folds
+require/provide commutativity: Algebird, for example, provides ordered
+distributed folds, and clojure.core.reducers preserves order as well.  Right
+now Tesser doesn't, but we might change that someday.
+
+Unlike CRDTs, Tesser's folds do not require idempotence. In Tesser, 1 + 1 is 2,
+not 1. Each input factors in to the reduced value exactly once--though the
+order is up to Tesser.
+
+## Representing a Fold
+
 In Tesser, we represent a compiled fold as map of six functions:
 
 ```clj
@@ -89,13 +102,47 @@ and combiner often have the same accumulator type and identities,
 this is not always the case.
 
 ```clj
-  {:reducer-identity  (constantly 0)
-   :reducer           +
-   :post-reducer      identity
-   :combiner-identity (constantly 0)
-   :combiner          +
-   :post-combiner     identity}
+(require '[tesser.core :as t])
+(t/tesser [[1] [2 3]]
+          (t/fold {:reducer-identity  (constantly 0)
+                   :reducer           +
+                   :post-reducer      identity
+                   :combiner-identity (constantly 0)
+                   :combiner          +
+                   :post-combiner     identity}))
+; => 6
 ```
+
+Since `(+)` returns `0` (the additive identity), we can leave off the
+identities; `t/fold` will use the reducer as the identity function. The same
+goes for the post-reducer and post-combiner: `(+ x)` returns `x`, so we can
+leave them off too:
+
+```clj
+(t/tesser [[1] [2 3]]
+          (t/fold {:reducer  +
+                   :combiner +}))
+; => 6
+```
+
+Or simply pass a function to `t/fold`, which will be used for all 6 functions.
+
+```clj
+(t/tesser [[1] [2 3]] (t/fold +))
+; => 6
+```
+
+But that's not all; we can transform the summing fold into one that operates on strings like "1" with the `map` function:
+
+```clj
+(->> (t/map read-string)
+     (t/fold +)
+     (t/tesser [["1" "2" "3"]]))
+; => 6
+```
+
+Tesser provides a rich library of fold transforms, allowing you to build up
+complex folds out of simple, modular parts.
 
 ## Core
 
@@ -104,10 +151,10 @@ the Clojure seq API, and many of its functions have similar names. Their
 semantics differ, however: Tesser folds do not preserve the order of inputs,
 and when executed, they run in *parallel*.
 
-Applying a fold using `tesser.core/tesser` uses mutiple threads proportional to
-processor cores. Unlike reducers, we don't use the Java forkjoin pool, just
-plain old threads. I've seen too many weird performance issues compared to
-regular threads.
+Applying a fold using `tesser.core/tesser` uses multiple threads proportional
+to processor cores. Unlike reducers, we don't use the Java forkjoin pool, just
+plain old threads; it avoid contention issues and improves performance on most
+JDKs.
 
 ```clj
 (require '[tesser.core :as t])
