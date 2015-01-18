@@ -30,7 +30,7 @@
 
       (->> (t/map inc)
            (t/filter even?)
-           (t/reduce +)
+           (t/fold +)
            (t/tesser [[1 2 3] [4 5 6]]))
       ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
@@ -220,7 +220,8 @@
 ;; Compiling and executing folds
 
 (defn assert-compiled-fold
-  "Is this a valid compiled fold?"
+  "Is this a valid compiled fold? Throws with a helpful message if the fold is
+  invalid."
   [f]
   (assert (fn? (:reducer-identity f))
           (str (pr-str f) " is missing a :reducer-identity fn"))
@@ -252,7 +253,10 @@
   "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
   num-procs threads for the parallel (reducer) portion of the fold. Reducers
   take turns combining their results, which prevents unbounded memory
-  consumption by the reduce phase."
+  consumption by the reduce phase.
+
+      (t/tesser [[\"hi\"] [\"there\"]] (t/fold str))
+      ; => \"therehi\""
   [seqs fold]
   (let [fold     (compile-fold fold)
         t0       (System/nanoTime)
@@ -377,7 +381,10 @@
 
 (deftransform map
   "Takes a function `f` and an optional fold. Returns a version of the fold
-  which finally calls (f input) to transform each element."
+  which finally calls (f input) to transform each element.
+
+      (->> (t/map inc) (t/into []) (t/tesser [[1 2] [3 4]]))
+      ; => [2 3 4 5]"
   [f]
   (assoc downstream :reducer (fn reducer [acc x]
                                (reducer- acc (f x)))))
@@ -398,7 +405,12 @@
   "Takes a function `f` and an optional fold. Returns a version of the fold
   which finally calls (f input) to transform each element. (f input) should
   return a *sequence* of inputs which will be fed to the downstream transform
-  independently."
+  independently.
+
+      (->> (t/mapcat seq) ; explode strings into seqs of chars
+           (t/set)
+           (t/tesser [[\"meow\" \"mix\"]]))
+      ; => #{\\e \\i \\m \\o \\w \\x}"
   [f]
   (assoc downstream :reducer (fn reducer [acc input]
                                (core/reduce reducer- acc (f input)))))
@@ -406,7 +418,12 @@
 (deftransform keep
   "Takes a function `f` and an optional fold. Returns a version of the fold
   which finally calls (f input) to transform each element, and passes it on to
-  subsequent transforms only when the result of (f input) is truthy."
+  subsequent transforms only when the result of (f input) is truthy.
+
+      (->> (t/keep {:a 1 :b 2})
+           (t/into [])
+           (t/tesser [[:a :b] [:c :d]]))
+      ; => [1 2]"
   [f]
   (assoc downstream :reducer (fn reducer [acc x]
                                (if-let [x' (f x)]
@@ -416,7 +433,12 @@
 (deftransform filter
   "Takes a predicate function `pred` and an optional fold. Returns a version of
   the fold which only passes on inputs to subsequent transforms when (pred
-  input) is truthy."
+  input) is truthy.
+
+      (->> (t/filter odd?)
+           (t/into [])
+           (t/tesser [[1 2 3 4 5 6]]))
+       ; => [1 3 5]"
   [pred]
   (assoc downstream :reducer (fn reducer [acc x]
                                (if (pred x)
@@ -426,7 +448,12 @@
 (deftransform remove
   "Takes a predicate function `pred` and an optional fold. Returns a version of
   the fold which only passes on inputs to subsequent transforms when (pred
-  input) is nil or false."
+  input) is nil or false.
+
+      (->> (t/remove odd?)
+           (t/into [])
+           (t/tesser [[1 2 3 4 5 6]]))
+       ; => [2 4 6]"
   [pred]
   (assoc downstream :reducer (fn reducer [acc x]
                                (if (pred x)
@@ -437,6 +464,12 @@
   "Like clojure.core/take, limits the number of inputs passed to the downstream
   transformer to exactly n, or if fewer than n inputs exist in total, all
   inputs.
+
+      (->> (t/map inc)
+           (t/take 5)
+           (t/into [])
+           (t/tesser [[1 2 3] [4 5 6] [7 8 9]]))
+      ; => [6 7 5 3 4]
 
   Space complexity note: take's reducers produce log2(chunk-size) reduced
   values per chunk, ranging from 1 to chunk-size/2 inputs, rather than a single
@@ -686,7 +719,10 @@
 
 (deftransform into
   "Adds all inputs to the given collection using conj. Ordering of elements
-  from distinct chunks is undefined."
+  from distinct chunks is undefined.
+
+      (t/tesser [[1 2 3] [4 5 6] [7 8 9]] (t/into []))
+      ; => [7 8 9 1 2 3 4 5 6]"
   [coll]
   (assert (nil? downstream))
   {:reducer-identity vector
@@ -860,7 +896,13 @@
 ;; Basic reductions
 
 (deftransform count
-  "How many inputs are there?"
+  "How many inputs are there?
+  For instance:
+
+      (->> (t/filter even?)
+           (t/count)
+           (t/tesser [[1 2 3] [4 5 6]]))
+      ; => 3"
   []
   (assert (nil? downstream))
   {:reducer-identity  (constantly 0)
@@ -871,7 +913,13 @@
    :post-combiner     identity})
 
 (deftransform set
-  "A hash-set of distinct inputs."
+  "A hash-set of distinct inputs.
+  For instance:
+
+      (->> (t/map inc)
+           (t/set)
+           (t/tesser [[1 2 3] [4 5 6]]))
+      ; => #{7 4 6 3 2 5}"
   []
   (assert (nil? downstream))
   {:reducer-identity      hash-set
@@ -883,7 +931,10 @@
 
 (deftransform frequencies
   "Like clojure.core/frequencies, returns a map of inputs to the number of
-  times those inputs appeared in the collection."
+  times those inputs appeared in the collection.
+
+      (t/tesser [[1 2 3] [1 1 1]] (t/frequencies))
+      ; => {1 4, 2 1, 3 1}"
   []
   (assert (nil? downstream))
   {:reducer-identity  hash-map
@@ -916,7 +967,11 @@
    :post-combiner         identity})
 
 (deftransform any
-  "Returns any single input from the collection. O(chunks)."
+  "Returns any single input from the collection. O(chunks).
+  For instance:
+
+      (t/tesser [[1 2 3] [4 5 6]] (t/any))
+      ; => 4"
   []
   (assert (nil? downstream))
   {:reducer-identity      (constantly nil)
@@ -967,7 +1022,11 @@
 ;; Comparable folds
 
 (deftransform extremum
-  "Finds the largest element using a comparison function (default: `compare`)."
+  "Finds the largest element using a comparison function, e.g. `compare`.
+  For example:
+
+      (t/tesser [[5 4] [3 2] [1 0]] (t/extremum compare))
+      ; => 5"
   [compare]
   (assert (nil? downstream))
   (letfn [(extremum-reducer [m x]
@@ -983,17 +1042,29 @@
      :post-combiner     identity}))
 
 (defn min
-  "Finds the smallest value using `compare`."
+  "Finds the smallest value using `compare`.
+  For example:
+
+      (t/tesser [[:a :b] [:c :d]] (t/min))
+      ; => :a"
   [& [f]]
   (->> f (extremum (comp - compare))))
 
 (defn max
-  "Finds the largest value using `compare`."
+  "Finds the largest value using `compare`.
+  For example:
+
+      (t/tesser [[:a :b] [:c :d]] (t/max))
+      ; => :d"
   [& [f]]
   (->> f (extremum compare)))
 
 (defn range
-  "Returns a pair of `[smallest largest]` inputs, using `compare`."
+  "Returns a pair of `[smallest largest]` inputs, using `compare`.
+  For example:
+
+      (t/tesser [[4 5 6] [1 2 3]] (t/range))
+      ; => [1 6]"
   [& [f]]
   (->> f
        (fuse {:min (min)
