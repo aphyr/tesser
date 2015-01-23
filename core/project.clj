@@ -1,4 +1,4 @@
-(defproject tesser.core "0.1.0-SNAPSHOT"
+(defproject tesser.core "0.1.1-SNAPSHOT"
   :description "Composable concurrent folds for Clojure."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
@@ -13,4 +13,7 @@
                                   [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
                                   [criterium "0.4.3"]
                                   [org.clojure/test.check "0.6.2-SNAPSHOT"]]
-                   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]}})
+                   ; :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
+                   }}
+  :test-selectors {:default #(not (:bench %))
+                   :bench   :bench})

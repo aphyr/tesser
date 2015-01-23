@@ -185,31 +185,48 @@
          (let [~acc (deref ~acc)] (reduced ~expr))
          ~expr))))
 
-(defn partition-vec
-  "Partitions a vector into groups of n (somewhat like partition)
+(defn partition-all-vec
+  "Partitions a vector into reducibles of size n (somewhat like partition-all)
   but uses subvec for speed.
 
-      (partition-vec 2 [1])     ; => ([1])
-      (partition-vec 2 [1 2 3]) ; => ([1 2] [3])
-
-  Unlike partition, won't return empty subsequences in cases like
-
-      (partition-vec 2 [1])
+      (partition-all-vec 2 [1])     ; => ([1])
+      (partition-all-vec 2 [1 2 3]) ; => ([1 2] [3])
 
   Useful for supplying vectors to tesser.core/tesser."
-  ([v] (partition-vec 512 v))
   ([^long n v]
-   (let [total-size (count v)]
-     (loop [start 0
-            end (min n total-size)
-            out (transient [])]
-     (let [curr (subvec v start end)]
-       (if (< (- end start) n)
-         (persistent! (conj! out curr))
-         (recur
-           end
-           (min (+ end n) total-size)
-           (conj! out curr))))))))
+   (let [c (count v)]
+     (->> (range 0 c n)
+          (map #(subvec v % (min c (+ % n))))))))
+
+(defn partition-all-array
+  "Partitions an array into reducibles of size n (like partition-all), but
+  faster."
+  ([^long n ary]
+   (let [c (count ary)]
+     (->> (range 0 c n)
+          (map (fn [start]
+                 (reify
+                   clojure.core.protocols/CollReduce
+                   (coll-reduce [this f]
+                     (clojure.core.protocols/coll-reduce this f (f)))
+                   (coll-reduce [_ f init]
+                     (let [i-final (dec (min (count ary) (+ start n)))]
+                       (loop [i   start
+                              acc init]
+                         (let [acc' (f acc (aget ary i))]
+                           (if (or (= i i-final)
+                                   (reduced? acc'))
+                             acc'
+                             (recur (inc i) acc')))))))))))))
+
+(defn partition-all-fast
+  "Like partition-all, but only emits reducibles. Faster for vectors and
+  arrays. May return chunks of any reducible type."
+  [^long n coll]
+  (cond
+    (vector? coll)              (partition-all-vec n coll)
+    (.. coll getClass isArray)  (partition-all-array n coll)
+    true                        (partition-all n coll)))
 
 (defn maybe-unary
   "Not all functions used in `tesser/fold` and `tesser/reduce` have a
