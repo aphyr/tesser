@@ -1,4 +1,4 @@
-(defproject tesser.hadoop "0.1.0-SNAPSHOT"
+(defproject tesser.hadoop "0.1.1-SNAPSHOT"
   :description "Tesser: Hadoop support via Parkour."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
