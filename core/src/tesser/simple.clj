@@ -13,7 +13,9 @@
   ([reducef coll]
    (fold reducef reducef coll))
   ([combinef reducef coll]
-   (t/tesser (partition-all-fast 512 coll)
+   (fold 512 combinef reducef coll))
+  ([n combinef reducef coll]
+   (t/tesser (partition-all-fast n coll)
              (t/fold {:reducer  reducef
                       :combiner combinef}))))
 
