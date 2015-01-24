@@ -1,4 +1,4 @@
-(ns tesser.perf-test
+(ns tesser.bench-test
   (:require [clojure.test :refer :all]
             [clojure.test.check :as tc]
             [clojure.test.check [clojure-test :refer :all]
@@ -49,3 +49,11 @@
                       (t/filter even?)
                       (t/fold +)
                       (t/tesser (partition-all-fast 1024 a))))))
+
+(deftest ^:bench stress
+  (let [a (long-vec)]
+    (dotimes [i 10000000]
+      (->> (t/map inc)
+           (t/filter even?)
+           (t/fold +)
+           (t/tesser (partition-all-fast 1024 a))))))

@@ -5,6 +5,13 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[interval-metrics "1.0.0"]]
   :jvm-opts ["-server"
+             "-Xms1024m"
+             "-Xmx1024m"
+             "-XX:+UseParNewGC"
+             "-XX:+UseConcMarkSweepGC"
+             "-XX:+CMSParallelRemarkEnabled"
+             "-XX:+AggressiveOpts"
+             "-XX:+UseFastAccessorMethods"
 ;             "-Dcom.sun.management.jmxremote"
 ;             "-XX:+UnlockCommercialFeatures"
 ;             "-XX:+FlightRecorder"

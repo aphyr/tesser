@@ -1,5 +1,6 @@
 (ns tesser.utils
   "Toolbox."
+  (:import (java.lang.reflect Array))
   (:require [clojure [set :as set]
                      [string :as str]
                      [walk :as walk]]
@@ -213,7 +214,7 @@
                      (let [i-final (dec (min (count ary) (+ start n)))]
                        (loop [i   start
                               acc init]
-                         (let [acc' (f acc (aget ary i))]
+                         (let [acc' (f acc (Array/get ary i))]
                            (if (or (= i i-final)
                                    (reduced? acc'))
                              acc'
@@ -224,9 +225,9 @@
   arrays. May return chunks of any reducible type."
   [^long n coll]
   (cond
-    (vector? coll)              (partition-all-vec n coll)
-    (.. coll getClass isArray)  (partition-all-array n coll)
-    true                        (partition-all n coll)))
+    (vector? coll)           (partition-all-vec n coll)
+    (.isArray (class coll))  (partition-all-array n coll)
+    true                     (partition-all n coll)))
 
 (defn maybe-unary
   "Not all functions used in `tesser/fold` and `tesser/reduce` have a
