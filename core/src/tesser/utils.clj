@@ -6,8 +6,6 @@
                      [walk :as walk]]
             [clojure.core.reducers :as r]))
 
-(set! *unchecked-math* true)
-
 (defn prepend
   "Prepends a single value to the beginning of a sequence. O(1) for sequences
   using cons, O(n) for vectors. Returns a singleton vector when coll is nil."
@@ -91,15 +89,6 @@
   ([m k f a b]          (assoc m k (f (get m k) a b)))
   ([m k f a b c]        (assoc m k (f (get m k) a b c)))
   ([m k f a b c & args] (assoc m k (apply f (get m k) a b c args))))
-
-(defn poll!
-  "Given an atom pointing to a sequence, pulls the first element off the
-  sequence atomically and returns it."
-  [a]
-  (when-let [xs @a]
-    (if (compare-and-set! a xs (next xs))
-      (first xs)
-      (recur a))))
 
 (defn map-vals
   "Maps over a key-value map, returning a new map by transforming each value

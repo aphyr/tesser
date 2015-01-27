@@ -67,6 +67,6 @@
 
 ; For profiling
 (deftest ^:stress stress
-  (let [a (long-ary)]
+  (let [a (long-vec)]
     (dotimes [i 10000000]
       (s/reduce + 0 a))))
