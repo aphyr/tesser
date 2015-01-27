@@ -36,8 +36,23 @@
     (quick-bench (s/reduce + 0 a))))
 
 (deftest ^:bench array-map-filter-fold-sum
-  (prn 'vec-map-filter-fold-sum)
+  (prn 'array-map-filter-fold-sum)
   (let [a (long-ary)]
+    (prn 'reducers)
+    (quick-bench (->> a
+                      (r/map inc)
+                      (r/filter even?)
+                      (r/fold +)))
+
+    (prn "tesser")
+    (quick-bench (->> (t/map inc)
+                      (t/filter even?)
+                      (t/fold +)
+                      (t/tesser (partition-all-fast 1024 a))))))
+
+(deftest ^:bench ^:focus vec-map-filter-fold-sum
+  (prn 'vec-map-filter-fold-sum)
+  (let [a (long-vec)]
     (prn 'reducers)
     (quick-bench (->> a
                       (r/map inc)

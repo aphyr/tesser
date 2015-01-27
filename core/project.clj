@@ -23,5 +23,6 @@
                    ; :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
                    }}
   :test-selectors {:default #(not-any? % [:stress :bench])
+                   :focus   :focus
                    :bench   :bench
                    :stress  :stress})
