@@ -19,7 +19,7 @@
                             (cumulative-sums (first coll)))))))
 
 (defspec partition-fast-spec
-  test-opts
+  {:num-tests 1000}
   (prop/for-all [coll (gen/one-of [(gen/list gen/int)
                                    (gen/vector gen/int)
                                    (gen/map gen/int gen/int)
@@ -30,3 +30,8 @@
                                 (map (partial into [])))
                            (partition-all n coll)))
                     (prn :n n :coll (seq coll)))))
+
+(deftest bytes?-test
+  (is (bytes? (byte-array [1 2 3])))
+  (is (not (bytes? nil)))
+  (is (not (bytes? (byte 4)))))

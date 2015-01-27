@@ -12,7 +12,7 @@
             [clojure.core.reducers :as r]
             [clojure.set :as set]))
 
-(def n 100000)
+(def n 1000000)
 
 (defn long-ary []
   (->> #(rand-int n)
@@ -26,19 +26,19 @@
        (take n)
        vec))
 
-;(deftest array-simple-reduce-sum
-;  (let [a (long-ary)]
-;    (prn "(reduce + 0 long-array)")
-;    (with-progress-reporting
-;      (quick-bench (reduce + 0 a)))
+(deftest ^:bench array-simple-reduce-sum
+  (prn 'array-simple-reduce-sum)
+  (let [a (long-ary)]
+    (prn 'reduce)
+    (quick-bench (reduce + 0 a))
 
-;    (prn "(s/reduce + 0 long-array)")
-;    (with-progress-reporting
-;      (quick-bench (s/reduce + 0 a)))))
+    (prn 'tesser)
+    (quick-bench (s/reduce + 0 a))))
 
 (deftest ^:bench array-map-filter-fold-sum
-  (let [a (long-vec)]
-    (prn "reducers")
+  (prn 'vec-map-filter-fold-sum)
+  (let [a (long-ary)]
+    (prn 'reducers)
     (quick-bench (->> a
                       (r/map inc)
                       (r/filter even?)
@@ -50,10 +50,8 @@
                       (t/fold +)
                       (t/tesser (partition-all-fast 1024 a))))))
 
-(deftest ^:bench stress
-  (let [a (long-vec)]
+; For profiling
+(deftest ^:stress stress
+  (let [a (long-ary)]
     (dotimes [i 10000000]
-      (->> (t/map inc)
-           (t/filter even?)
-           (t/fold +)
-           (t/tesser (partition-all-fast 1024 a))))))
+      (s/reduce + 0 a))))

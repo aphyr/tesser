@@ -6,6 +6,8 @@
                      [walk :as walk]]
             [clojure.core.reducers :as r]))
 
+(set! *unchecked-math* true)
+
 (defn prepend
   "Prepends a single value to the beginning of a sequence. O(1) for sequences
   using cons, O(n) for vectors. Returns a singleton vector when coll is nil."
@@ -186,6 +188,90 @@
          (let [~acc (deref ~acc)] (reduced ~expr))
          ~expr))))
 
+(defmacro def-type-predicate
+  "Takes an instance of an object and defines a function that tests an object
+  to see if its class is an instance of the exemplar's."
+  [name exemplar]
+  `(let [c# (class ~exemplar)]
+    (defn ~name [x#] (instance? c# x#))))
+
+(def-type-predicate bytes?    (byte-array 0))
+(def-type-predicate shorts?   (short-array 0))
+(def-type-predicate ints?     (int-array 0))
+(def-type-predicate longs?    (long-array 0))
+(def-type-predicate floats?   (float-array 0))
+(def-type-predicate doubles?  (double-array 0))
+(def-type-predicate objects?  (object-array 0))
+
+(defmacro reducible-slice
+  "A reducible slice of an indexed collection. Expands into a reified
+  CollReduce which uses `(getter coll ... i)` to return the `i`th element.
+  Defined as a macro so we can do primitive agets, which are waaaay faster for
+  arrays. Slice will have maximum length n, and starts at index i0."
+  [getter coll length offset]
+  `(reify
+     clojure.core.protocols/CollReduce
+
+     (coll-reduce [this# f#]
+       (clojure.core.protocols/coll-reduce this# f# (f#)))
+
+     (coll-reduce [_ f# init#]
+       (let [length#  (long ~length)
+             offset#  (long ~offset)
+             i-final# (dec (min (count ~coll) (+ offset# length#)))]
+       (loop [i#    offset#
+              acc#  init#]
+         (let [acc# (f# acc# (~getter ~coll i#))]
+           (if (or (= i# i-final#)
+                   (reduced? acc#))
+             acc#
+             (recur (inc i#) acc#))))))))
+
+; Slices over primitive arrays
+
+(defn reducible-slice-bytes
+  [^bytes ary chunk-size offset]
+  (reducible-slice aget ary chunk-size offset))
+
+(defn reducible-slice-shorts
+  [^shorts ary chunk-size offset]
+  (reducible-slice aget ary chunk-size offset))
+
+(defn reducible-slice-ints
+  [^ints ary chunk-size offset]
+  (reducible-slice aget ary chunk-size offset))
+
+(defn reducible-slice-longs
+  [^longs ary chunk-size offset]
+  (reducible-slice aget ary chunk-size offset))
+
+(defn reducible-slice-floats
+  [^floats ary chunk-size offset]
+  (reducible-slice aget ary chunk-size offset))
+
+(defn reducible-slice-doubles
+  [^doubles ary chunk-size offset]
+  (reducible-slice aget ary chunk-size offset))
+
+(defn reducible-slice-objects
+  [^objects ary chunk-size offset]
+  (reducible-slice aget ary chunk-size offset))
+
+(defn partition-all-array
+  "Partitions an array into reducibles of size `chunk-size` (like
+  partition-all), but faster."
+  ([^long chunk-size ary]
+   (let [slicer (cond
+                  (bytes? ary)    reducible-slice-bytes
+                  (shorts? ary)   reducible-slice-shorts
+                  (ints? ary)     reducible-slice-ints
+                  (longs? ary)    reducible-slice-longs
+                  (floats? ary)   reducible-slice-floats
+                  (doubles? ary)  reducible-slice-doubles
+                  (objects? ary)  reducible-slice-objects)]
+     (->> (range 0 (count ary) chunk-size)
+          (map (partial slicer ary chunk-size))))))
+
 (defn partition-all-vec
   "Partitions a vector into reducibles of size n (somewhat like partition-all)
   but uses subvec for speed.
@@ -198,27 +284,6 @@
    (let [c (count v)]
      (->> (range 0 c n)
           (map #(subvec v % (min c (+ % n))))))))
-
-(defn partition-all-array
-  "Partitions an array into reducibles of size n (like partition-all), but
-  faster."
-  ([^long n ary]
-   (let [c (count ary)]
-     (->> (range 0 c n)
-          (map (fn [start]
-                 (reify
-                   clojure.core.protocols/CollReduce
-                   (coll-reduce [this f]
-                     (clojure.core.protocols/coll-reduce this f (f)))
-                   (coll-reduce [_ f init]
-                     (let [i-final (dec (min (count ary) (+ start n)))]
-                       (loop [i   start
-                              acc init]
-                         (let [acc' (f acc (Array/get ary i))]
-                           (if (or (= i i-final)
-                                   (reduced? acc'))
-                             acc'
-                             (recur (inc i) acc')))))))))))))
 
 (defn partition-all-fast
   "Like partition-all, but only emits reducibles. Faster for vectors and

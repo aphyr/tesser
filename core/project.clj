@@ -16,11 +16,12 @@
 ;             "-XX:+UnlockCommercialFeatures"
 ;             "-XX:+FlightRecorder"
              ]
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.7.0-alpha5"]
                                   [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
                                   [criterium "0.4.3"]
                                   [org.clojure/test.check "0.6.2-SNAPSHOT"]]
                    ; :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
                    }}
-  :test-selectors {:default #(not (:bench %))
-                   :bench   :bench})
+  :test-selectors {:default #(not-any? % [:stress :bench])
+                   :bench   :bench
+                   :stress  :stress})
