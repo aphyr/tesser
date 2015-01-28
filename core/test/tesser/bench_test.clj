@@ -69,4 +69,7 @@
 (deftest ^:stress stress
   (let [a (long-vec)]
     (dotimes [i 10000000]
-      (s/reduce + 0 a))))
+      (->> a
+           (r/map inc)
+           (r/filter even?)
+           (r/fold +)))))

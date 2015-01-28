@@ -36,7 +36,7 @@
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
                             not-every? replace group-by reduce])
-  (:import (java.util.concurrent LinkedBlockingQueue))
+  (:import (java.lang Iterable))
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
             [interval-metrics.measure :as measure]
@@ -258,11 +258,11 @@
 
       (t/tesser [[\"hi\"] [\"there\"]] (t/fold str))
       ; => \"therehi\""
-  [chunks fold]
+  [^Iterable chunks fold]
   (let [fold     (compile-fold fold)
         t0       (System/nanoTime)
         threads  (.. Runtime getRuntime availableProcessors)
-        queue    (LinkedBlockingQueue. (* 128 threads))
+        iter     (.iterator chunks)
         combiner (fn combiner [combined x]
                    (if (reduced? combined)
                      combined
@@ -271,12 +271,7 @@
         chunks-exhausted? (atom false)]
 ;        stats    (measure/periodically 1 (println @chunks "chunks processed"))]
     (try
-      (let [filler (.start
-                     (Thread.
-                       (fn []
-                         (doseq [chunk chunks] (.put queue chunk))
-                         (dotimes [i threads]  (.put queue ::complete)))))
-            workers
+      (let [workers
             (->> threads
                  core/range
                  (core/mapv
@@ -284,22 +279,25 @@
                      (future-call
                        (fn []
                          (while
-                           (let [chunk (.take queue)]
-                             (when (not= ::complete chunk)
+                           (let [chunk (locking iter
+                                         (if (.hasNext iter)
+                                           (.next iter)
+                                           ::finished))]
+                             (when (not= ::finished chunk)
                                ; Concurrent reduction
                                (let [result (->> chunk
                                                  (core/reduce
                                                    (:reducer fold)
                                                    ((:reducer-identity fold)))
-                                                 ((:post-reducer fold)))]
+                                                 ((:post-reducer fold)))
 
-                                 ; Sequential combine phase
-                                 (let [combined'
-                                       (locking combined
-                                         (swap! combined combiner result))]
+                                     ; Sequential combine phase
+                                     combined' (locking combined
+                                                 (swap! combined
+                                                        combiner result))]
 
-                                   ; Abort early if reduced.
-                                   (not (reduced? combined'))))))))))))]
+                                 ; Abort early if reduced.
+                                 (not (reduced? combined')))))))))))]
         (try
           ; Wait for workers
           (core/mapv deref workers)
