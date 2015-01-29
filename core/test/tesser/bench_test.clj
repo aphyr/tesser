@@ -34,7 +34,7 @@
           (prn)
           (prn collf reducef)
           (prn)
-          (let [coll    @collf
+          (let [coll    (@collf)
                 reducef @reducef]
             (quick-bench (reducef + 0 coll)))))))
 
