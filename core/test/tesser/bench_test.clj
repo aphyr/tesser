@@ -29,14 +29,14 @@
 (deftest ^:bench ^:focus sum
   (dorun
     (for [collf   [#'long-ary #'long-vec]
-          reducef [#'reduce #'r/fold #'s/reduce]]
+          reducef [#'reduce #'r/fold #'s/fold]]
       (do (prn)
           (prn)
           (prn collf reducef)
           (prn)
           (let [coll    (@collf)
                 reducef @reducef]
-            (quick-bench (reducef + 0 coll)))))))
+            (quick-bench (reducef + coll)))))))
 
 (deftest ^:bench vec-map-filter-fold-sum
   (prn 'vec-map-filter-fold-sum)
