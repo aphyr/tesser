@@ -250,6 +250,25 @@
                     nil)
        assert-compiled-fold))
 
+(defn- chunk-reducer
+  "Given a compiled fold, constructs a function which takes a chunk and returns
+  its post-reduced value."
+  [{:keys [reducer reducer-identity post-reducer]}]
+  (fn r [chunk]
+    (->> chunk
+         (r/reduce reducer (reducer-identity))
+         post-reducer)))
+
+(defn- chunk-combiner
+  "Given a compiled fold, returns a reducing function that merges new
+  post-reduced values into an accumulator `combined`, iff the current
+  accumulator is not already reduced."
+  [{:keys [combiner]}]
+  (fn c [combined post-reduced]
+    (if (reduced? combined)
+      combined
+      (combiner combined post-reduced))))
+
 (defn tesser
   "Compiles a fold and applies it to a sequence of sequences of inputs. Runs
   num-procs threads for the parallel (reducer) portion of the fold. Reducers
@@ -263,33 +282,26 @@
         t0       (System/nanoTime)
         threads  (.. Runtime getRuntime availableProcessors)
         iter     (.iterator chunks)
-        combiner (fn combiner [combined x]
-                   (if (reduced? combined)
-                     combined
-                     ((:combiner fold) combined x)))
-        combined (atom ((:combiner-identity fold)))
-        chunks-exhausted? (atom false)]
+        reducer  (chunk-reducer fold)
+        combiner (chunk-combiner fold)
+        combined (atom ((:combiner-identity fold)))]
 ;        stats    (measure/periodically 1 (println @chunks "chunks processed"))]
     (try
       (let [workers
             (->> threads
                  core/range
                  (core/mapv
-                   (fn worker [i]
+                   (fn spawn [i]
                      (future-call
-                       (fn []
+                       (fn worker []
                          (while
                            (let [chunk (locking iter
                                          (if (.hasNext iter)
                                            (.next iter)
                                            ::finished))]
                              (when (not= ::finished chunk)
-                               ; Concurrent reduction
-                               (let [result (->> chunk
-                                                 (core/reduce
-                                                   (:reducer fold)
-                                                   ((:reducer-identity fold)))
-                                                 ((:post-reducer fold)))
+                               (let [; Concurrent reduction
+                                     result (reducer chunk)
 
                                      ; Sequential combine phase
                                      combined' (locking combined

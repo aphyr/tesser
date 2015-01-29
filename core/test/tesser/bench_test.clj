@@ -69,7 +69,7 @@
 (deftest ^:stress stress
   (let [a (long-vec)]
     (dotimes [i 10000000]
-      (->> a
-           (r/map inc)
-           (r/filter even?)
-           (r/fold +)))))
+      (->> (t/map inc)
+           (t/filter even?)
+           (t/fold +)
+           (t/tesser (partition-all-fast 1024 a))))))
