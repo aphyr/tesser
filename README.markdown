@@ -380,11 +380,18 @@ be significantly faster than `clojure.core/reduce` and somewhat faster than
 `clojure.core.reducers/fold`. Tesser performs worst when the reducing
 operations are cheap compared to the cost of traversing the collection. Even in
 these cases, Tesser's performance on laptop and server-class x64 hardware ain't
-too shabby:
+too shabby.
 
-| Collection | Clojure reduce | Reducers fold | Tesser |
-|------------|----------------|---------------|--------|
-|
+On a 48-way (including HT) E5-2697, summing 10 million random longs:
+
+| Collection | Clojure reduce | Reducers fold | Tesser   |
+|------------|----------------|---------------|----------|
+| Array      | 460 MHz        | 420 MHz       | 2900 MHz |
+|------------|----------------|---------------|----------|
+| Vector     |                |               |          |
+|------------|----------------|---------------|----------|
+
+Run `lein test :bench` to reproduce results on your hardware.
 
 ## Vs Reducers and Transducers
 

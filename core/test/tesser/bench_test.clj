@@ -26,32 +26,45 @@
        (take n)
        vec))
 
-(deftest ^:bench ^:focus sum
+(defn sep
+  ([& args]
+   (prn)
+   (prn)
+   (apply println args)
+   (prn)))
+
+(deftest ^:bench sum
+  (sep "######   Simple sum   ########")
   (dorun
     (for [collf   [#'long-ary #'long-vec]
           reducef [#'reduce #'r/fold #'s/fold]]
-      (do (prn)
-          (prn)
-          (prn collf reducef)
-          (prn)
-          (let [coll    (@collf)
-                reducef @reducef]
-            (quick-bench (reducef + coll)))))))
+      (let [coll    (@collf)
+            reducef @reducef]
+        (sep collf reducef)
+        (quick-bench (reducef + coll))))))
 
-(deftest ^:bench vec-map-filter-fold-sum
-  (prn 'vec-map-filter-fold-sum)
-  (let [a (long-vec)]
-    (prn 'reducers)
-    (quick-bench (->> a
-                      (r/map inc)
-                      (r/filter even?)
-                      (r/fold +)))
+(deftest ^:focus ^:bench map-filter-sum
+  (sep "#######   map/filter/sum   #######")
+  (dorun
+    (for [collf  [#'long-ary #'long-vec]]
+      (let [coll (@collf)]
+        (sep collf "seq/reduce")
+        (quick-bench (->> coll
+                          (map inc)
+                          (filter even?)
+                          (reduce +)))
 
-    (prn "tesser")
-    (quick-bench (->> (t/map inc)
-                      (t/filter even?)
-                      (t/fold +)
-                      (t/tesser (partition-all-fast 1024 a))))))
+        (sep collf "reducers fold")
+        (quick-bench (->> coll
+                          (r/map inc)
+                          (r/filter even?)
+                          (r/fold +)))
+
+        (sep collf "tesser")
+        (quick-bench (->> (t/map inc)
+                          (t/filter even?)
+                          (t/fold +)
+                          (t/tesser (partition-all-fast 16384 coll))))))))
 
 ; For profiling
 (deftest ^:stress stress
