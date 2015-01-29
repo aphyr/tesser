@@ -388,10 +388,41 @@ On a 48-way (including HT) E5-2697, summing 10 million random longs:
 |------------|----------------|---------------|----------|
 | Array      | 460 MHz        | 420 MHz       | 2900 MHz |
 |------------|----------------|---------------|----------|
-| Vector     |                |               |          |
+| Vector     | 490 MHz        | 4300 MHz      | 4700 MHz |
+|------------|----------------|---------------|----------|
+
+And the equivalent of `(->> (map inc) (filter even?) (reduce +))` over those 10
+million longs:
+
+| Collection | Clojure reduce | Reducers fold | Tesser   |
+|------------|----------------|---------------|----------|
+| Array      | 43 MHz         | 270 MHz       | 2400 MHz |
+|------------|----------------|---------------|----------|
+| Vector     | 120 MHz        | 3400 MHz      | 3200 MHz |
 |------------|----------------|---------------|----------|
 
 Run `lein test :bench` to reproduce results on your hardware.
+
+In general, Tesser...
+
+- Captures most of the stream-fusion benefits of reducers (reduced intermediate
+  allocations for map/filter)
+- Can parallelize over primitive arrays (unlike reducers), and
+- Reduces thread contention versus Java forkjoin (used by reduces/fold).
+
+However, Tesser cannot automatically partition and traverse vectors as
+efficiently as core.reducers can, which makes it slightly slower when you have
+a single vector and ask Tesser to partition it for you. Passing a series of
+vectors to `tesser.core/tesser` makes Tesser's traversal costs identical to
+core.reducers.
+
+There's also some low-hanging fruit in `fuse`, `take`, etc. that can be
+optimized later; we allocate fresh vectors to box reduction state on every new
+input, instead of clobbering a variable in place. Haven't gotten around to
+tuning that yet.
+
+In real-world applications, Tesser has significantly improved single-node
+performance relative to `reducers/fold`, but YMMV.
 
 ## Vs Reducers and Transducers
 
