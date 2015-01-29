@@ -387,9 +387,7 @@ On a 48-way (including HT) E5-2697, summing 10 million random longs:
 | Collection | Clojure reduce | Reducers fold | Tesser   |
 |------------|----------------|---------------|----------|
 | Array      | 460 MHz        | 420 MHz       | 2900 MHz |
-|------------|----------------|---------------|----------|
 | Vector     | 490 MHz        | 4300 MHz      | 4700 MHz |
-|------------|----------------|---------------|----------|
 
 And the equivalent of `(->> (map inc) (filter even?) (reduce +))` over those 10
 million longs:
@@ -397,9 +395,7 @@ million longs:
 | Collection | Clojure reduce | Reducers fold | Tesser   |
 |------------|----------------|---------------|----------|
 | Array      | 43 MHz         | 270 MHz       | 2400 MHz |
-|------------|----------------|---------------|----------|
 | Vector     | 120 MHz        | 3400 MHz      | 3200 MHz |
-|------------|----------------|---------------|----------|
 
 Run `lein test :bench` to reproduce results on your hardware.
 
