@@ -402,7 +402,7 @@ Run `lein test :bench` to reproduce results on your hardware.
 In general, Tesser...
 
 - Sees the same benefits of stream fusion as reducers: fewer allocations for
-  intermediate seqs.
+  intermediate seqs,
 - Can parallelize over primitive arrays (unlike reducers), and
 - Reduces thread contention versus Java forkjoin (used by `reducers/fold`).
 
