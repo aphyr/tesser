@@ -373,6 +373,19 @@ simple invariants.
   completion of that particular reduce or combine. If a reducer emits a reduced
   value, it has no impact on the execution of other reducers, or the combiner.
 
+## Performance
+
+When the computation you're performing on each input dominates, Tesser should
+be significantly faster than `clojure.core/reduce` and somewhat faster than
+`clojure.core.reducers/fold`. Tesser performs worst when the reducing
+operations are cheap compared to the cost of traversing the collection. Even in
+these cases, Tesser's performance on laptop and server-class x64 hardware ain't
+too shabby:
+
+| Collection | Clojure reduce | Reducers fold | Tesser |
+|------------|----------------|---------------|--------|
+|
+
 ## Vs Reducers and Transducers
 
 Clojure's reducers and transducers embody sequential folds: they move from left
