@@ -43,7 +43,7 @@ You've got 48 cores in your desktop computer. Why aren't they all helping?
 (->> (t/filter main-sequence)
      (t/map :mass)
      (t/fold +)
-     (t/tesser (partition 100 stars)))
+     (t/tesser (t/chunk 1024 stars)))
 ```
 
 Tesser goes much deeper, but this is the essence: writing understandable,
@@ -86,7 +86,18 @@ order is up to Tesser.
 
 ## Representing a Fold
 
-In Tesser, we represent a compiled fold as map of six functions:
+If all you need is a quick-n-dirty replacement for an existing `reduce` or
+`fold`, just drop `tesser.simple` into your program.
+
+```clj
+(require '[tesser.simple :as s])
+user=> (s/reduce + 0 (range 10000000))
+  49999995000000
+```
+
+But Tesser is capable of *composing* folds together--combining simple functions
+to express complex ideas. In Tesser, we represent a compiled fold as map of six
+functions:
 
 ```clj
 {:reducer-identity  (fn [] ...)
