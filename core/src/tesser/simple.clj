@@ -15,7 +15,7 @@
   ([combinef reducef coll]
    (fold 16384 combinef reducef coll))
   ([n combinef reducef coll]
-   (t/tesser (partition-all-fast n coll)
+   (t/tesser (t/chunk n coll)
              (t/fold {:reducer  reducef
                       :combiner combinef}))))
 
@@ -24,6 +24,6 @@
   chunks. Unlike `core/reduce`, does not preserve order, init must be an
   identity element, f must be associative, etc."
   ([f init coll]
-   (t/tesser (partition-all-fast 16384 coll)
+   (t/tesser (t/chunk 16384 coll)
              (t/fold {:reducer  f
                       :identity (constantly init)}))))

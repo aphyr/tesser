@@ -35,7 +35,7 @@
       ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
-                            not-every? replace group-by reduce])
+                            not-every? replace group-by reduce chunk])
   (:import (java.lang Iterable))
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
@@ -249,6 +249,8 @@
        (core/reduce (fn [compiled build] (build compiled))
                     nil)
        assert-compiled-fold))
+
+(def chunk reducible-chunk)
 
 (defn- chunk-reducer
   "Given a compiled fold, constructs a function which takes a chunk and returns

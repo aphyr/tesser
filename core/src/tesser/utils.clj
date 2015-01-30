@@ -246,9 +246,9 @@
   [^objects ary chunk-size offset]
   (reducible-slice aget ary chunk-size offset))
 
-(defn partition-all-array
+(defn chunk-array
   "Partitions an array into reducibles of size `chunk-size` (like
-  partition-all), but faster."
+  chunk), but faster."
   ([^long chunk-size ary]
    (let [slicer (cond
                   (bytes? ary)    reducible-slice-bytes
@@ -261,12 +261,12 @@
      (->> (range 0 (count ary) chunk-size)
           (map (partial slicer ary chunk-size))))))
 
-(defn partition-all-vec
+(defn chunk-vec
   "Partitions a vector into reducibles of size n (somewhat like partition-all)
   but uses subvec for speed.
 
-      (partition-all-vec 2 [1])     ; => ([1])
-      (partition-all-vec 2 [1 2 3]) ; => ([1 2] [3])
+      (chunk-vec 2 [1])     ; => ([1])
+      (chunk-vec 2 [1 2 3]) ; => ([1 2] [3])
 
   Useful for supplying vectors to tesser.core/tesser."
   ([^long n v]
@@ -274,13 +274,19 @@
      (->> (range 0 c n)
           (map #(subvec v % (min c (+ % n))))))))
 
-(defn partition-all-fast
+(defn reducible-chunk
   "Like partition-all, but only emits reducibles. Faster for vectors and
-  arrays. May return chunks of any reducible type."
+  arrays. May return chunks of any reducible type. Useful for supplying colls
+  to tesser.
+
+      (->> [1 2 3 4 5 6 7 8]
+           (chunk 2)
+           (map (partial into [])))
+      ; => ([1 2] [3 4] [5 6] [7 8])"
   [^long n coll]
   (cond
-    (vector? coll)           (partition-all-vec n coll)
-    (.isArray (class coll))  (partition-all-array n coll)
+    (vector? coll)           (chunk-vec n coll)
+    (.isArray (class coll))  (chunk-array n coll)
     true                     (partition-all n coll)))
 
 (defn maybe-unary

@@ -26,7 +26,7 @@
                                    (gen/fmap long-array (gen/vector gen/int))])
                  n    (gen/choose 1 50)]
                 (or (is (= (->> coll
-                                (partition-all-fast n)
+                                (reducible-chunk n)
                                 (map (partial into [])))
                            (partition-all n coll)))
                     (prn :n n :coll (seq coll)))))

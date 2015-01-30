@@ -32,6 +32,16 @@
 
 ;; Tests
 
+(defspec chunk-spec
+  test-opts
+  (prop/for-all [inputs (gen/vector gen/int)]
+                (is (= (->> (t/map inc)
+                            (t/frequencies)
+                            (t/tesser (t/chunk 10 inputs)))
+                       (->> inputs
+                            (map inc)
+                            frequencies)))))
+
 (defspec fold-full-spec
   test-opts
   (prop/for-all [chunks (chunks gen/int)]
