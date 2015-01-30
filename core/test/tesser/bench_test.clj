@@ -64,7 +64,7 @@
         (quick-bench (->> (t/map inc)
                           (t/filter even?)
                           (t/fold +)
-                          (t/tesser (partition-all-fast 16384 coll))))))))
+                          (t/tesser (t/chunk 16384 coll))))))))
 
 ; For profiling
 (deftest ^:stress stress
@@ -73,4 +73,4 @@
       (->> (t/map inc)
            (t/filter even?)
            (t/fold +)
-           (t/tesser (partition-all-fast 1024 a))))))
+           (t/tesser (t/chunk 1024 a))))))
