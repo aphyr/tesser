@@ -1,4 +1,4 @@
-(defproject tesser.hadoop "1.0.0"
+(defproject tesser.hadoop "1.0.1"
   :description "Tesser: Hadoop support via Parkour."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
@@ -18,7 +18,7 @@
              {:dependencies [[org.clojure/clojure "1.6.0"]
                              [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
                              [criterium "0.4.3"]
-                             [org.clojure/test.check "0.6.2-SNAPSHOT"]]}
+                             [org.clojure/test.check "0.7.0"]]}
              :provided
              {:dependencies
               ; Just so we can compile our Writable
