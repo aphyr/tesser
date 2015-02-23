@@ -206,14 +206,15 @@
   {::mr/source-as :vals
    ::mr/sink-as   :vals}
   [records]
-  (r/map identity records))
+  records)
 
 (defn partition-randomly
-  ^long [key val ^long nparts]
+  "Partitions map task outputs randomly and uniformly among the reduce tasks."
+  ^long [_ _ ^long nparts]
   (rand-int nparts))
 
-(defn set-one-reducer
-  "Takes a jobconf, returns a jobconf with mapred.reduce.tasks set to 1."
+(defn set-one-reducer!
+  "Takes a jobconf, returns the jobconf with mapred.reduce.tasks set to 1."
   [conf]
   (conf/assoc! conf "mapred.reduce.tasks" 1))
 
@@ -259,7 +260,7 @@
           (pg/partition kv-classes #'partition-randomly)
           (pg/reduce #'fold-reducer-without-post-combiner fold-name args)
           (pg/output (dsink workdir path1))))
-    (run (set-one-reducer conf)
+    (run (set-one-reducer! conf)
       (-> (pg/input (dsink workdir path1))
           (pg/map #'identity-mapper)
           (pg/partition kv-classes)
