@@ -182,8 +182,8 @@
   fold to dump its output to, in `[NullWritable FressianWritable]` format."
   [work-dir file-name]
   (->> file-name
-              (fs/path work-dir)
-              (seqf/dsink [NullWritable FressianWritable])))
+       (fs/path work-dir)
+       (seqf/dsink [NullWritable FressianWritable])))
 
 (defn fold
   "A simple, all-in-one fold operation. Takes a jobconf, workdir, input dseq,
@@ -200,3 +200,69 @@
                   first)]
         (when (error? x) (throw (ex-info "Hadoop fold error" x)))
         x))))
+
+(defn identity-mapper
+  "Does nothing in the map step."
+  {::mr/source-as :vals
+   ::mr/sink-as   :vals}
+  [records]
+  records)
+
+(defn partition-randomly
+  "Partitions map task outputs randomly and uniformly among the reduce tasks."
+  ^long [_ _ ^long nparts]
+  (rand-int nparts))
+
+(defn set-one-reducer!
+  "Takes a jobconf, returns the jobconf with mapred.reduce.tasks set to 1."
+  [conf]
+  (conf/assoc! conf "mapred.reduce.tasks" 1))
+
+(defn fold-reducer-without-post-combiner
+  "Like fold-reducer, but omits :post-combiner so it can be used in reduce tasks that are continued in multiple jobs."
+  {::mr/source-as :vals
+   ::mr/sink-as   :vals}
+  [fold-name fold-args input]
+  (list (try (let [fold (rehydrate-fold fold-name fold-args)
+                   combiner (:combiner fold)
+                   combined (reduce (fn [acc x]
+                                      (try
+                                        (if (error? x)
+                                          (reduced x)
+                                          (combiner acc x))
+                                        (catch Exception e
+                                          (reduced (serialize-error acc x e)))))
+                                    ((:combiner-identity fold))
+                                    input)]
+               combined)
+             (catch Exception e
+               (serialize-error nil nil e)))))
+
+(defn fold-reduce-twice
+  "Like fold, but in two stages (jobs). First job uses the number of reduce tasks specified in mapred.reduce.tasks.
+  The second job does nothing in the map step, then uses one reduce task."
+  [conf input workdir fold-var & args]
+  (let [fold-name  (var->sym fold-var)
+        path       (name fold-name)
+        path1      (str path "-1")
+        path2      (str path "-2")
+        kv-classes [NullWritable FressianWritable]
+
+        run (fn [conf graph]
+              (let [x (-> graph
+                          (execute conf)
+                          first)]
+                (when (error? x) (throw (ex-info "Hadoop fold error" x)))
+                x))]
+    (run conf
+      (-> (pg/input input)
+          (pg/map #'fold-mapper fold-name args)
+          (pg/partition kv-classes #'partition-randomly)
+          (pg/reduce #'fold-reducer-without-post-combiner fold-name args)
+          (pg/output (dsink workdir path1))))
+    (run (set-one-reducer! conf)
+      (-> (pg/input (dsink workdir path1))
+          (pg/map #'identity-mapper)
+          (pg/partition kv-classes)
+          (pg/reduce #'fold-reducer fold-name args)
+          (pg/output (dsink workdir path2))))))
