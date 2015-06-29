@@ -285,6 +285,23 @@
            (t/tesser [[1 2 2 3 3 3 3 3 3 3 3]]))
       ; => 3.0009765625
 
+  You may also use `tesser.cardinality/hll` for estimating the cardinality of a
+  set. HLL+ uses a probabilistic data-structure to compute set cardinality using
+  very little memory with accuracy tradeoffs.
+
+  The HLL digest can be used like the above mentioned histograms:
+
+      (def digest (->> (m/digest cardinality/hll)
+                       (t/tesser [[1 1 1 1 1 1 2 2 2 3 3 4 5]])))
+      ; => #<HyperLogLogPlus...>
+
+  Getting the cardinality out through a post-combine step:
+
+      (->> (m/digest cardinality/hll)
+           (t/post-combine #(q/point-count %))
+           (t/tesser [[1 2 2 3 3 3 3 3 3 3 3]]))
+      ; => 3
+
   I want to emphasize that depending on the size of your data, its
   distribution, and the number of digests you want to compute, you may need
   different digest algorithms and widely varying tuning parameters. Until we
