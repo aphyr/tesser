@@ -14,7 +14,10 @@
            (org.fressian.handlers WriteHandler
                                   ReadHandler)
            (org.HdrHistogram DoubleHistogram)
-           (tesser.quantiles DualHistogram)))
+           (tesser.quantiles DualHistogram)
+           (com.clearspring.analytics.stream.cardinality
+                HyperLogLogPlus
+                HyperLogLogPlus$Builder)))
 
 ; TODO: extract serialization for math into tesser.math itself? Common
 ; interface somewhere?
@@ -229,7 +232,16 @@
             (if (pos? i)
               (recur (dec i)
                      (conj s (.readObject rdr)))
-              s)))))
+              s)))
+
+
+    HyperLogLogPlus "hyperloglogplus-estimator"
+    (write [_ w hll]
+           (write-tag! 1)
+           (.writeBytes w (.getBytes ^HyperLogLogPlus hll)))
+
+    (read [_ rdr _ _]
+          (HyperLogLogPlus$Builder/build ^bytes (.readObject rdr)))))
 
 (defn ^bytes write-byte-array
   "Dump a structure to a byte array using our handlers."
