@@ -23,4 +23,6 @@
              {:dependencies
               ; Just so we can compile our Writable
               [[org.apache.hadoop/hadoop-client "2.0.0-mr1-cdh4.3.0"
-                :exclusions [org.slf4j/slf4j-api]]]}})
+                :exclusions [org.slf4j/slf4j-api]]
+               ; for compiling without tesser.math
+               [com.clearspring.analytics/stream "2.7.0"]]}})
