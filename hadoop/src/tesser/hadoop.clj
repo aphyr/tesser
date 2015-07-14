@@ -30,7 +30,8 @@
                                  NullWritable
                                  BytesWritable
                                  Writable)
-           (org.apache.hadoop.mapred JobPriority)))
+           (org.apache.hadoop.mapred JobPriority)
+           (org.apache.hadoop.conf Configuration)))
 
 (defn resolve+
   "Resolves a symbol to a var, requiring the namespace if necessary. If the
@@ -185,14 +186,29 @@
        (fs/path work-dir)
        (seqf/dsink [NullWritable FressianWritable])))
 
+(defn ^:private output-path
+  "Extract the output path from fold-var metadata. If not provided, fallback to
+  conf key or just the fold-var name.
+
+  Metadata key: :tesser.hadoop/output-path
+  Configuration key: tesser.output.path"
+  [^Configuration conf fold-var]
+  (.replaceAll                          ;remove trailing slashes, if any
+   ^String (or (::output-path (meta fold-var))
+               (.get conf "tesser.output.path")
+               (name (var->sym fold-var)))
+   "/+$" ""))
+
 (defn fold
   "A simple, all-in-one fold operation. Takes a jobconf, workdir, input dseq,
   var which points to a fold function, and arguments for the fold function.
   Runs the fold against the dseq and returns its results. Names output dsink
-  after fold symbol. On error, throws an `ex-info`."
+  after metadata key :tesser.hadoop/output-path in fold symbol. If absent, uses
+  the conf key tesser.hadoop.output-path and finally falls back
+  to the fold symbol. On error, throws an `ex-info`."
   [conf input workdir fold-var & args]
   (let [in       (pg/input input)
-        path     (name (var->sym fold-var))]
+        path     (output-path conf fold-var)]
     (try
       (let [x (-> (apply fold* in fold-var args)
                   (pg/output (dsink workdir path))
@@ -243,7 +259,7 @@
   The second job does nothing in the map step, then uses one reduce task."
   [conf input workdir fold-var & args]
   (let [fold-name  (var->sym fold-var)
-        path       (name fold-name)
+        path       (output-path conf fold-var)
         path1      (str path "-1")
         path2      (str path "-2")
         kv-classes [NullWritable FressianWritable]
