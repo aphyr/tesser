@@ -1,4 +1,4 @@
-(defproject tesser.hadoop "1.0.1"
+(defproject tesser.hadoop "1.0.2"
   :description "Tesser: Hadoop support via Parkour."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
@@ -8,8 +8,8 @@
                   "-source" "1.5"]
   :repositories
   {"cloudera" "https://repository.cloudera.com/artifactory/cloudera-repos/"}
-  :dependencies [[tesser.core "1.0.0"]
-                 [tesser.math "1.0.0"]
+  :dependencies [[tesser.core "1.0.1"]
+                 [tesser.math "1.0.1"]
                  [org.clojure/data.fressian "0.2.0"]
                  [com.damballa/parkour "0.5.4"]
                  [org.codehaus.jsr166-mirror/jsr166y "1.7.0"]
