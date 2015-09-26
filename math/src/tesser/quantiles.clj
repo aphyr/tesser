@@ -96,13 +96,10 @@
 
   CumulativeDistribution
   (cumulative-distribution [digest]
-    (->> digest
-         .recordedValues
-         .iterator
-         iterator-seq
-         (map (fn [^DoubleHistogramIterationValue i]
-                [(.getValueIteratedTo i)
-                 (.getTotalCountToThisValue i)])))))
+    (->> (.recordedValues digest)
+         (mapv (fn [^DoubleHistogramIterationValue i]
+                 [(.getValueIteratedTo i)
+                  (.getTotalCountToThisValue i)])))))
 
 (defn hdr-histogram
   "Constructs a new HDRHistogram for doubles.
