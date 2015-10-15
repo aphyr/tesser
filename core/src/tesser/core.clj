@@ -881,17 +881,23 @@
   [fold-map]
   (assert (nil? downstream))
   (let [ks             (vec (keys fold-map))
+        n              (core/count ks)
         folds          (mapv (comp compile-fold (partial get fold-map)) ks)
-        reducers       (core/map :reducer folds)
-        combiners      (core/map :combiner folds)]
+        reducers       (mapv :reducer folds)
+        combiners      (mapv :combiner folds)]
     ; We're gonna project into a particular key basis vector for the
     ; reduce/combine steps
-    {:reducer-identity    (if (core/empty? fold-map)
-                            vector
-                            (apply juxt (core/map :reducer-identity folds)))
-     :reducer             (fn reducer [accs x]
-                            (mapv (fn [f acc] (f acc x))
-                                  reducers accs))
+    {:reducer-identity    (fn identity []
+                            (let [a (object-array n)]
+                              (dotimes [i n]
+                                (aset a i ((-> folds
+                                               (nth i)
+                                               :reducer-identity))))
+                              a))
+     :reducer             (fn reducer [^objects accs x]
+                            (dotimes [i n]
+                              (aset accs i ((nth reducers i) (aget accs i) x)))
+                            accs)
      :post-reducer        identity
      :combiner-identity   (if (core/empty? fold-map)
                             vector

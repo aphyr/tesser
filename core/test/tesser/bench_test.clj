@@ -43,7 +43,7 @@
         (sep collf reducef)
         (quick-bench (reducef + coll))))))
 
-(deftest ^:focus ^:bench map-filter-sum
+(deftest ^:bench map-filter-sum
   (sep "#######   map/filter/sum   #######")
   (dorun
     (for [collf  [#'long-ary #'long-vec]]
@@ -65,6 +65,14 @@
                           (t/filter even?)
                           (t/fold +)
                           (t/tesser (t/chunk 16384 coll))))))))
+
+(deftest ^:bench ^:focus fuse
+  (sep "#####   Fuse   #####")
+  (let [coll (long-ary)]
+    (time (->> (t/fuse {:sum (t/fold +)
+                        :evens (->> (t/filter even?) (t/count))
+                        :odds  (->> (t/filter odd?) (t/count))})
+               (t/tesser (t/chunk 16384 coll))))))
 
 ; For profiling
 (deftest ^:stress stress
