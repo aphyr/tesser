@@ -164,7 +164,7 @@ and when executed, they run in *parallel*.
 
 Applying a fold using `tesser.core/tesser` uses multiple threads proportional
 to processor cores. Unlike reducers, we don't use the Java forkjoin pool, just
-plain old threads; it avoid contention issues and improves performance on most
+plain old threads; it avoids contention issues and improves performance on most
 JDKs.
 
 ```clj
