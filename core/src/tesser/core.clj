@@ -370,7 +370,7 @@
      ; Version with fold argument
      ([~@args fold#]
       (~conjoiner fold#
-                  (fn build [~'downstream]
+                  (fn ~'build [~'downstream]
                     (let ~'[reducer-identity-   (:reducer-identity downstream)
                             reducer-            (:reducer downstream)
                             post-reducer-       (:post-reducer downstream)
