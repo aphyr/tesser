@@ -190,6 +190,16 @@
                 (is (= (sort (t/tesser chunks (t/into [])))
                        (sort (flatten1 chunks))))))
 
+(deftest into-vec-stack-overflow-regression
+  (testing (str "t/into used to have a stack overflow bug for large numbers "
+                "of chunks because of concat usage like described here: "
+                "https://stuartsierra.com/2015/04/26/clojure-donts-concat")
+    (let [n 100000]
+      (is (= (set (range n))
+             (->> (t/into [])
+                  (t/tesser (map vector (range n)))
+                  set))))))
+
 (defspec into-set-spec
   test-opts
   (prop/for-all [chunks (chunks gen/int)]
