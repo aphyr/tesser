@@ -9,9 +9,9 @@
                  [tesser.hadoop "1.0.2"
                   :exclusions [org.codehaus.jackson/jackson-mapper-asl
                                org.codehaus.jackson/jackson-core-asl]]]
-  :codox {:sources ["../core/src"
-                    "../math/src"
-                    "../hadoop/src"]
+  :codox {:source-paths ["../core/src"
+                         "../math/src"
+                         "../hadoop/src"]
           :output-path "doc/"
           :source-uri "http://github.com/aphyr/tesser/blob/{version}/{filepath}#L{line}"
           :metadata {:doc/format :markdown}}
