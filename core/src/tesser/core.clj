@@ -742,9 +742,9 @@
   {:reducer-identity vector
    :reducer          conj
    :post-reducer     identity
-   :combiner-identity vector
-   :combiner          core/concat
-   :post-combiner     (partial core/into coll)})
+   :combiner-identity (constantly coll)
+   :combiner          core/into
+   :post-combiner     identity})
 
 (defwraptransform post-combine
   "Transforms the output of a fold by applying a function to it.
@@ -798,12 +798,21 @@
                                  ; necessary.
                                  (get acc category (reducer-identity-))
                                  input))))
-   :post-reducer    identity
-   :combiner-identity hash-map
-   :combiner        (fn combiner [m1 m2]
-                      (merge-with combiner- m1 m2))
-   :post-combiner   (fn post-combiner [m]
-                      (map-vals post-combiner- m))})
+   :post-reducer      identity
+   :combiner-identity (comp transient hash-map)
+   :combiner          (fn combiner [m1 m2]
+                        (core/reduce (fn [m pair]
+                                       (let [k  (key pair)
+                                             v2 (val pair)
+                                             v1 (get m k ::not-found)
+                                             v1 (if (= v1 ::not-found)
+                                                  (combiner-identity-)
+                                                  v1)]
+                                         (assoc! m k (combiner- v1 v2))))
+                                m1
+                                m2))
+   :post-combiner     (fn post-combiner [m]
+                        (map-vals post-combiner- (persistent! m)))})
 
 (deftransform facet
   "Your inputs are maps, and you want to apply a fold to each value
