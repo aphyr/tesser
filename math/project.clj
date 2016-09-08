@@ -1,10 +1,10 @@
-(defproject tesser.math "1.0.1"
+(defproject tesser.math "1.0.2"
   :description "Concurrent folds for statistical analysis"
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :dependencies [[tesser.core "1.0.1"]
+  :dependencies [[tesser.core "1.0.2"]
 ;                 [com.tdunning/t-digest "3.0"]
                  [com.clearspring.analytics/stream "2.7.0"]
                  [org.hdrhistogram/HdrHistogram "2.1.2"]

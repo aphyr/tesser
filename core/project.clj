@@ -1,4 +1,4 @@
-(defproject tesser.core "1.0.1"
+(defproject tesser.core "1.0.2"
   :description "Composable concurrent folds for Clojure."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
