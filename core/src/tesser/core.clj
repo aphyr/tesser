@@ -743,8 +743,8 @@
    :reducer          conj
    :post-reducer     identity
    :combiner-identity vector
-   :combiner          core/concat
-   :post-combiner     (partial core/into coll)})
+   :combiner          conj
+   :post-combiner     #(core/into coll (apply concat %))})
 
 (defwraptransform post-combine
   "Transforms the output of a fold by applying a function to it.
