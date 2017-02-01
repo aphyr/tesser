@@ -80,21 +80,6 @@
   ([init coll]
    (reductions + init coll)))
 
-(defmacro unless-update [body]
-  (when (neg? (compare [1 7 0] (mapv (partial get *clojure-version*) [:major :minor :incremental])))
-    body))
-
-(unless-update
-  (defn update
-    "Given a map, a key, a function f, and optional args, returns a copy of map
-    with that key set to (f current-val arg1 arg2 ...). Like update-in, but only
-    one level deep."
-    ([m k f]              (assoc m k (f (get m k))))
-    ([m k f a]            (assoc m k (f (get m k) a)))
-    ([m k f a b]          (assoc m k (f (get m k) a b)))
-    ([m k f a b c]        (assoc m k (f (get m k) a b c)))
-    ([m k f a b c & args] (assoc m k (apply f (get m k) a b c args)))))
-
 (defn map-vals
   "Maps over a key-value map, returning a new map by transforming each value
   with (f v)."
