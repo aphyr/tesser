@@ -40,7 +40,8 @@ You've got 48 cores in your desktop computer. Why aren't they all helping?
 
 ```clj
 (require '[tesser.core :as t])
-(->> (t/filter main-sequence)
+(->> stars
+     (t/filter main-sequence)
      (t/map :mass)
      (t/fold +)
      (t/tesser (t/chunk 1024 stars)))
