@@ -1,5 +1,6 @@
 (ns tesser.utils
   "Toolbox."
+  (:refer-clojure :exclude [bytes? update])
   (:import (java.lang.reflect Array))
   (:require [clojure [set :as set]
                      [string :as str]

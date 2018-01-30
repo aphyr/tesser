@@ -35,7 +35,7 @@
       ; => 2 + 4 + 6 = 12"
   (:refer-clojure :exclude [map mapcat keep filter remove count min max range
                             frequencies into set some take empty? every?
-                            not-every? replace group-by reduce chunk])
+                            not-every? replace group-by reduce chunk bytes? update])
   (:import (java.lang Iterable))
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
