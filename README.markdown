@@ -281,7 +281,19 @@ example of how to run a fold in Hadoop.
 
 ## An integrative example
 
-Here's a real-world example, drawn from a user profile verification suite:
+Let's say we're public health researchers, and we're trying to understand what
+factors influence the prevalence of a communicable disease. There are three
+medications, x, y, and z, which show promise for preventing its spread, but not everyone takes medications regularly. We have anonymized case reports for each infection, like:
+
+```clj
+{:year        2011                ; The year the infection was reported
+ :age         22                  ; The patient's age
+ :zip         94110               ; The patient's zip code
+ :primary-facility "City Clinic"  ; Where does this person go for care?
+ :medications [:x, :y]            ; The medications this person has been using
+ :compliance  {:x 0.9             ; How often do they adhere to the
+               :y 0.6}            ; prescribed dosage?
+```
 
 ```clj
 (require '[tesser.core :as t]
@@ -289,81 +301,52 @@ Here's a real-world example, drawn from a user profile verification suite:
           [tesser.quantiles :as q])
 
 (defn fold
-  "Computes aggregate statistics over profiles by country, income, age range,
-  and gender."
+  "Computes aggregate statistics over infection cases"
   []
   (t/fuse
-    {:total     (t/count)
-     :country   (->> (t/map (comp :country :geo))
-                     (t/frequencies)
-                     (t/post-combine (partial into (sorted-map))))
-     :income    (->> (t/map (comp :value :income))
-                     (t/remove nil?)
-                     (m/digest (partial q/dual q/hdr-histogram))
-                     (t/post-combine q/distribution))
-     :no-income (->> (t/remove (comp :value :income))
-                     (t/count))
-     :age-range (->> (t/map (comp :range :age :demographic))
-                     (t/frequencies)
-                     (t/post-combine (partial into (sorted-map))))
-     :gender    (->> (t/map (fn [u]
-                             (let [g (-> u :demographic :gender)
-                                   m (-> g :male :confidence)
-                                   f (-> g :female :confidence)]
-                               (cond (not (or m f)) nil
-                                     (not m)        :female
-                                     (not f)        :male
-                                     (<= -1/2 (- m f) 1/2) :rich-tapestry
-                                     (<= m f)       :female
-                                     :else          :male))))
-                     (t/frequencies))}))
-```
+    {; Total number of cases
+     :total       (t/count)
 
-Here's another fold, from a namespace that analyzes behavioral segments (e.g.
-commuters).  We're using the `metric-fold` function to do the same type of
-numeric reduction (a range and a quantile digest) over two different fields:
-`:percentile` and `:confidence`. Note that `metric-fold` takes an argument `f`:
-the fold that it will transform.
+     ; How has the number of cases changed over time?
+     :trend       (->> (t/group-by :year)
+                       (t/count))
 
-```clj
-(defn metric-fold
-  "A fold which analyzes the range and quantile distribution of a number,
-  returing a map of :range and :q-digest. Drops nils."
-  [f]
-  (->> f
-       (t/remove nil?)
-       (t/fuse {:q-digest (m/digest (partial q/dual q/hdr-histogram))
-                :range    (t/range)})))
+     ; Number of cases for the year 2018, broken down by zip code
+     :recent-cases (->> (t/filter #(= 2018 (:year %)))
+                        (t/group-by :zip)
+                        (t/count))
 
-(defn fold
-  "Analyzes behavioral segments. Emits nested maps where the first key is the
-  segment name (:leisure_seeker), the second key is one of :percentile or
-  :confidence, and the third key is one of :q-digest or :range."
-  []
-  (->> (t/map :behavioral)
-       (t/map :segments)
-       ; For each distinct segment...
-       (t/facet)
-       ; Could facet here, but fuse is a lil more efficient.
-       (t/fuse
-         {:percentile (->> (t/map :percentile) (metric-fold))
-          :confidence (->> (t/map :confidence) (metric-fold))})))
-```
+     ; A sorted map of ages to the number of cases with that age
+     :age-range   (->> (t/map :age)
+                       (t/frequencies)
+                       (t/post-combine (partial into (sorted-map))))
 
-Because the folds aren't bound to any particular datatype, we can combine them using `fuse` and transform their inputs using a parser--in a single pass.
+     ; How many cases were on no medications at all?
+     :no-meds     (->> (t/filter (comp empty? :medications))
+                       (t/count))
 
-```clj
-(defn main-fold [opts]
-  (->> (t/map (file/parser (:format opts)))
-       (t/fuse {:behavioral-segments (behavioral-segments/fold)
-                :demographics        (demographics/fold)})))
+     ; A histogram of medication compliance, broken down by medication type
+     :med-compliance (->> (t/map :compliance)
+                          (t/facet)
+                          (m/digest (partial q/dual q/hdr-histogram))
+                          (t/post-combine q/distribution))
+
+     ; Correlation and coocurrence count between age and number of medications
+     :age-meds  (m/correlation+count :age (comp count :medications))
+
+     ; The covariance matrix between medication compliance--are any pair of
+     medications linearly covariant?
+     :med-cov        (->> (t/map :compliance)
+                          (m/covariance-matrix {:x :x
+                                                :y :y
+                                                :z :z}))}))
 ```
 
 Because these folds are collection-indepedent, and defined in small chunks, we
-can write small tests to verify each folds behavior indepedently, then compose
-them into larger programs. We're free to name transformations at any level just
-by binding them to `let` variables or `defn`s, or to build complex folds in a
-single pass.
+can break them up into functions, write small tests to verify each folds
+behavior indepedently, then compose them into larger programs. We're free to
+name transformations at any level by binding them to `let` variables or
+`defn`s, or to build complex folds in a single pass.
 
 ## Invariants
 
