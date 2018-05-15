@@ -448,7 +448,19 @@ cd hadoop/ && lein do test, install && cd ../
 Commit
 
 ```
-lein
+VERSION="x.x.x"
+git commit -a -m "Version $VERSION"
+git tag $VERSION
+git push
+git push --tags
+```
+
+Deploy
+
+```
+cd core/ && lein deploy clojars && cd ../
+cd math/ && lein deploy clojars && cd ../
+cd hadoop/ && lein deploy clojars && cd ../
 ```
 
 Rebuild documentation
@@ -464,9 +476,6 @@ gh-pages)
 cd all/doc && git commit -am "Docs for version x.x.x"
 git push
 ```
-
-
-
 
 ## Contributors
 
