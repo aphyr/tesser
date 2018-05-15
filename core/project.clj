@@ -1,4 +1,4 @@
-(defproject tesser.core "1.0.2"
+(defproject tesser.core "1.0.3"
   :description "Composable concurrent folds for Clojure."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
@@ -16,7 +16,7 @@
 ;             "-XX:+UnlockCommercialFeatures"
 ;             "-XX:+FlightRecorder"
              ]
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.7.0"]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.9.0"]
                                   [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
                                   [criterium "0.4.3"]
                                   [org.clojure/test.check "0.7.0"]]

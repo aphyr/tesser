@@ -433,6 +433,41 @@ Tesser explores a different niche. It offers:
 - *Collection independence.* Like Transducers, Tesser folds are abstract
   transformations and can be re-used against varying types of collections.
 
+## Building
+
+- Update project versions in core/project.clj, math/project.clj, hadoop/project.clj, all/project.clj
+
+Test and install
+
+```
+cd core/ && lein do test, install && cd ../
+cd math/ && lein do test, install && cd ../
+cd hadoop/ && lein do test, install && cd ../
+```
+
+Commit
+
+```
+lein
+```
+
+Rebuild documentation
+
+```
+cd all/ && lein codox
+```
+
+Docs commit on gh-pages branch (assumes you've got all/doc set up as
+gh-pages)
+
+```
+cd all/doc && git commit -am "Docs for version x.x.x"
+git push
+```
+
+
+
+
 ## Contributors
 
 - [Kyle Kingsbury](mailto:aphyr@aphyr.com)

@@ -1,12 +1,12 @@
-(defproject tesser.all "1.0.2"
+(defproject tesser.all "1.0.3"
   :description "Not a real library; just a placeholder for unifying all the docs."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :repositories {"cloudera" "https://repository.cloudera.com/artifactory/cloudera-repos/"}
-  :dependencies [[tesser.core   "1.0.2"]
-                 [tesser.math   "1.0.2"]
-                 [tesser.hadoop "1.0.2"
+  :dependencies [[tesser.core   "1.0.3"]
+                 [tesser.math   "1.0.3"]
+                 [tesser.hadoop "1.0.3"
                   :exclusions [org.codehaus.jackson/jackson-mapper-asl
                                org.codehaus.jackson/jackson-core-asl]]]
   :codox {:source-paths ["../core/src"
@@ -15,7 +15,7 @@
           :output-path "doc/"
           :source-uri "http://github.com/aphyr/tesser/blob/{version}/{filepath}#L{line}"
           :metadata {:doc/format :markdown}}
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.6.0"]]}
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.9.0"]]}
              ; Parkour won't compile without hadoop
              :provided
              {:dependencies
