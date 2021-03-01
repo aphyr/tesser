@@ -1,4 +1,4 @@
-(defproject tesser.core "1.0.3"
+(defproject tesser.core "1.0.4-SNAPSHOT"
   :description "Composable concurrent folds for Clojure."
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
@@ -7,17 +7,12 @@
   :jvm-opts ["-server"
              "-Xms1024m"
              "-Xmx1024m"
-             "-XX:+UseParNewGC"
-             "-XX:+UseConcMarkSweepGC"
-             "-XX:+CMSParallelRemarkEnabled"
-             "-XX:+AggressiveOpts"
-             "-XX:+UseFastAccessorMethods"
 ;             "-Dcom.sun.management.jmxremote"
 ;             "-XX:+UnlockCommercialFeatures"
 ;             "-XX:+FlightRecorder"
              ]
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.9.0"]
-                                  [org.clojars.achim/multiset "0.1.0-SNAPSHOT"]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.0"]
+                                  [org.clojars.achim/multiset "0.1.1-SNAPSHOT"]
                                   [criterium "0.4.3"]
                                   [org.clojure/test.check "0.7.0"]]
                    ; :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]

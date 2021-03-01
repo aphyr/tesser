@@ -1,6 +1,6 @@
 (ns tesser.utils
   "Toolbox."
-  (:refer-clojure :exclude [bytes? update])
+  (:refer-clojure :exclude [update])
   (:import (java.lang.reflect Array))
   (:require [clojure [set :as set]
                      [string :as str]
@@ -175,7 +175,6 @@
   `(let [c# (class ~exemplar)]
     (defn ~name [x#] (instance? c# x#))))
 
-(def-type-predicate bytes?    (byte-array 0))
 (def-type-predicate shorts?   (short-array 0))
 (def-type-predicate ints?     (int-array 0))
 (def-type-predicate longs?    (long-array 0))
