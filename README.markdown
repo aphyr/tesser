@@ -2,7 +2,6 @@
 |----------|---------|---------|
 | [tesser.core](http://aphyr.github.io/tesser/tesser.core.html) | [tesser.core](https://clojars.org/tesser.core) | The core library and essential folds |
 | [tesser.math](http://aphyr.github.io/tesser/tesser.math.html) | [tesser.math](https://clojars.org/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc. |
-| [tesser.hadoop](http://aphyr.github.io/tesser/tesser.hadoop.html) | [tesser.hadoop](https://clojars.org/tesser.hadoop) | Run folds on Hadoop via Parkour |
 
 # Tesser
 
@@ -244,6 +243,11 @@ weight; and in the same pass, to find the total number of samples:
 Ready? [To the tesser.math API!](http://aphyr.github.io/tesser/tesser.math.html)
 
 ## Hadoop
+
+*Update, 2021-03-01: Parkour, the library tesser.hadoop used to talk to Hadoop,
+hasn't been maintained in some time: its dependencies are now unresolvable.
+Tesser is likely still a good fit for Hadoop, but I need someone who actually
+uses Hadoop to take this over. PRs, please!*
 
 The [tesser.hadoop API](http://aphyr.github.io/tesser/tesser.hadoop.html) takes
 Tesser folds and distributes them using the
