@@ -6,7 +6,7 @@
             [tesser.utils :refer :all]
             [tesser.quantiles :as q]
             [clojure.core.reducers :as r]
-            [clojure.math.numeric-tower :refer :all]
+            [clojure.math.numeric-tower :refer [sqrt]]
             [clojure.math.combinatorics :as combo]
             [clojure.set  :as set]
             [clojure.core :as core]))

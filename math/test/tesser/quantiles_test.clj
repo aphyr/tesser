@@ -1,6 +1,5 @@
 (ns tesser.quantiles-test
   (:require [clojure.test :refer :all]
-            [clojure.math.numeric-tower :refer :all]
             [clojure.pprint :refer [pprint]]
             [clojure.test.check :as tc]
             [clojure.test.check [clojure-test :refer :all]

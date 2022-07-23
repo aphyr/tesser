@@ -1,6 +1,6 @@
 (ns tesser.math-test
   (:require [clojure.test :refer :all]
-            [clojure.math.numeric-tower :refer :all]
+            [clojure.math.numeric-tower :refer [expt sqrt]]
             [clojure.test.check :as tc]
             [clojure.test.check [clojure-test :refer :all]
                                 [generators :as gen]
@@ -136,8 +136,10 @@
                             ["z" "y"] yz}))))))
 
 (defn correlation
+  "Computes the correlation coefficient over a collection of points, given two
+  functions of a point `(fx point)` and `(fy point)`. See
+  http://mathworld.wolfram.com/CorrelationCoefficient.html"
   [fx fy coll]
-  "http://mathworld.wolfram.com/CorrelationCoefficient.html"
   (let [coll (filter fx (filter fy coll))]
     (when-not (empty? coll)
       (let [xs (map fx coll)

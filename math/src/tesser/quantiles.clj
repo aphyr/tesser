@@ -8,7 +8,7 @@
            (java.util.zip Deflater))
   (:require [tesser.utils :refer :all]
             [clojure.core.reducers :as r]
-            [clojure.math.numeric-tower :refer :all]
+            [clojure.math.numeric-tower :refer []]
             [clojure.math.combinatorics :as combo]
             [clojure.set  :as set]
             [clojure.core :as core]))
@@ -105,12 +105,12 @@
   "Constructs a new HDRHistogram for doubles.
   Default options:
 
-      {:highest-to-lowest-value-ratio 1e13
-       :significant-value-digits      4}"
+      {:highest-to-lowest-value-ratio 1e8
+       :significant-value-digits      3}"
   ([] (hdr-histogram {}))
   ([opts]
-   (DoubleHistogram. (or (:highest-to-lowest-value-ratio opts) 1e8)
-                     (or (:significant-value-digits      opts) 3))))
+   (DoubleHistogram. (long (or (:highest-to-lowest-value-ratio opts) 1e8))
+                     (int (or (:significant-value-digits      opts) 3)))))
 
 ; A histogram that covers both negative and positive numbers by routing to
 ; two distinct histograms. 0 is considered positive here.
