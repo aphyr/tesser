@@ -3,7 +3,7 @@
   :url "http://github.com/aphyr/tesser"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[interval-metrics "1.0.0"]]
+  :dependencies [[interval-metrics "1.0.1"]]
   :jvm-opts ["-server"
              "-Xms1024m"
              "-Xmx1024m"

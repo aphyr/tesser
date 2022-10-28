@@ -454,7 +454,7 @@ Commit
 ```
 VERSION="x.x.x"
 git commit -a -m "Version $VERSION"
-git tag $VERSION
+git tag "v$VERSION"
 git push
 git push --tags
 ```
