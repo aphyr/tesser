@@ -789,16 +789,16 @@
                        {:name :down,     :type :quark,  :mass 3.5}]]))
       ; => {:lepton 105.65, :quark 3.5}"
   [category-fn]
-  {:reducer-identity hash-map
-   :reducer         (fn reducer [acc input]
-                      (let [category (category-fn input)]
-                        (assoc acc category
-                               (reducer-
-                                 ; TODO: invoke downstream identity only when
-                                 ; necessary.
-                                 (get acc category (reducer-identity-))
-                                 input))))
-   :post-reducer      identity
+  {:reducer-identity (comp transient hash-map)
+   :reducer          (fn reducer [acc input]
+                       (let [category (category-fn input)
+                             cat-acc  (get acc category ::not-found)
+                             cat-acc  (if (identical? ::not-found cat-acc)
+                                        (reducer-identity-)
+                                        cat-acc)]
+                         (assoc! acc category (reducer- cat-acc input))))
+   :post-reducer      (fn post-reducer [acc]
+                          (map-vals post-reducer- (persistent! acc)))
    :combiner-identity (comp transient hash-map)
    :combiner          (fn combiner [m1 m2]
                         (core/reduce (fn [m pair]

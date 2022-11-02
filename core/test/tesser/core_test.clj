@@ -286,6 +286,24 @@
                               (map (fn [[k vs]] [k (apply multiset vs)]))
                               (into {})))))))
 
+(defspec group-by-post-reducer-spec
+  test-opts
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [g #(mod % 3)]
+                  (is (= (->> (flatten1 chunks)
+                              (group-by g)
+                              (map-vals (partial reduce max 0)))
+                         (->> (t/group-by g)
+                              ; In each group, find maximum, but with a weird
+                              ; intermediate datatype
+                              (t/fold {:reducer
+                                       (fn
+                                         ([] [:secret 0])
+                                         ([[_ m]] m)
+                                         ([[_ m] x] [:secret (max m x)]))})
+                              (t/tesser chunks)))))))
+
+
 (defspec facet-spec
   test-opts
   ; Sum over maps of keywords to ints

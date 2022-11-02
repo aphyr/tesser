@@ -66,7 +66,7 @@
                           (t/fold +)
                           (t/tesser (t/chunk 16384 coll))))))))
 
-(deftest ^:bench ^:focus fuse
+(deftest ^:bench fuse
   (sep "#####   Fuse   #####")
   (let [coll (long-ary)]
     (time (->> (t/fuse {:sum (t/fold +)
