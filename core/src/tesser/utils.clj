@@ -124,10 +124,40 @@
   [_ x]
   (when-not (nil? x) (reduced x)))
 
+(defn first-reducer
+  "A reducing function that returns the first input it sees, or not-found."
+  ([]
+   (first-reducer nil))
+  ([not-found]
+   (fn reducer
+     ([] ::not-found)
+     ([x] (if (identical? x ::not-found)
+            not-found
+            x))
+     ([_ x]
+      (if (identical? x ::not-found)
+        x
+        (reduced x))))))
+
+(defn last-reducer
+  "A reducing function that returns the last input it sees, or not-found."
+  ([]
+   (last-reducer nil))
+  ([not-found]
+   (fn reducer
+     ([] ::not-found)
+     ([x] (if (identical? x ::not-found)
+            not-found
+            x))
+     ([acc x]
+      (if (identical? x ::not-found)
+        acc
+        x)))))
+
 (defn reduce-first
   "clojure.core/first, but for for reducibles."
   [reducible]
-  (reduce (fn [_ x] (reduced x)) nil reducible))
+  (reduce (first-reducer) nil reducible))
 
 (defmacro scred
   "Helper for short-circuiting nested reduction functions which can emit

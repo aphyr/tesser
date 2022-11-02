@@ -33,9 +33,10 @@
            (t/fold +)
            (t/tesser [[1 2 3] [4 5 6]]))
       ; => 2 + 4 + 6 = 12"
-  (:refer-clojure :exclude [map mapcat keep filter remove count min max range
-                            frequencies into set some take empty? every?
-                            not-every? replace group-by reduce chunk bytes? update])
+  (:refer-clojure :exclude [bytes? chunk count empty? every? first filter into
+                            frequencies map mapcat keep remove min max last
+                            range set some take not-every? replace group-by
+                            reduce update])
   (:import (java.lang Iterable))
   (:require [tesser.utils :refer :all]
             [interval-metrics.core :as metrics]
@@ -612,7 +613,7 @@
                                       (partition 2 reductions))]
 
                      ; Break off as soon as we have n elements
-                     (if (= n (first acc'))
+                     (if (= n (core/first acc'))
                        (reduced acc')
                        acc')))
 
@@ -973,9 +974,9 @@
       ; => #{7 4 6 3 2 5}"
   []
   (assert (nil? downstream))
-  {:reducer-identity      hash-set
-   :reducer               conj
-   :post-reducer          identity
+  {:reducer-identity      (comp transient hash-set)
+   :reducer               conj!
+   :post-reducer          persistent!
    :combiner-identity     hash-set
    :combiner              set/union
    :post-combiner         identity})
@@ -1017,20 +1018,58 @@
    :combiner              first-non-nil-reducer
    :post-combiner         identity})
 
-(deftransform any
-  "Returns any single input from the collection. O(chunks).
+(deftransform first
+  "When executed concurrently, returns the first element *some* reducer saw.
+  When executed in order, returns the first element in the collection.
+  O(chunks).
+
   For instance:
 
-      (t/tesser [[1 2 3] [4 5 6]] (t/any))
-      ; => 4"
+  (t/tesser [[1 2 3] [4 5 6]] (t/first))
+  ; => 4"
   []
   (assert (nil? downstream))
-  {:reducer-identity      (constantly nil)
-   :reducer               first-non-nil-reducer
-   :post-reducer          identity
-   :combiner-identity     (constantly nil)
-   :combiner              first-non-nil-reducer
-   :post-combiner         identity})
+  (let [r (first-reducer ::not-found)
+        c (fn combiner
+            ([]    ::not-found)
+            ([x]   (when-not (identical? x ::not-found) x))
+            ([_ x] (if (identical? x ::not-found)
+                     x
+                     (reduced x))))]
+    {:reducer-identity      r
+     :reducer               r
+     :post-reducer          r
+     :combiner-identity     c
+     :combiner              c
+     :post-combiner         c}))
+
+(def any
+  "Alias for `first`."
+  first)
+
+(deftransform last
+  "When executed concurrently, returns the last element some reducer saw. When
+  executed in order, returns the last element in the collection. O(n).
+
+  For instance:
+
+      (t/tesser [[1 2 3] [4 5 6] (t/last))
+      ; => 3"
+  []
+  (assert (nil? downstream))
+  (let [r (last-reducer ::not-found)
+        c (fn combiner
+            ([]    ::not-found)
+            ([x]   (when-not (identical? x ::not-found) x))
+            ([acc x] (if (identical? x ::not-found)
+                       acc
+                       x)))]
+    {:reducer-identity  r
+     :reducer           r
+     :post-reducer      r
+     :combiner-identity c
+     :combiner          c
+     :post-combiner     c}))
 
 ;; Predicate folds
 

@@ -9,7 +9,7 @@
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
-(def test-opts {:num-tests 1000
+(def test-opts {:num-tests 100
                 :par 256})
 
 (prn test-opts)
@@ -361,7 +361,21 @@
   test-opts
   (prop/for-all [chunks (chunks gen/int)]
                 (let [e           (t/tesser chunks (t/any))
-                      candidates  (set (flatten1 chunks))]
+                      candidates  (->> chunks
+                                       (filter seq)
+                                       (map first)
+                                       set)]
+                  (is (or (contains? candidates e)
+                          (and (empty? candidates) (nil? e)))))))
+
+(defspec last-spec
+  test-opts
+  (prop/for-all [chunks (chunks gen/int)]
+                (let [e          (t/tesser chunks (t/last))
+                      candidates  (->> chunks
+                                       (filter seq)
+                                       (map last)
+                                       set)]
                   (is (or (contains? candidates e)
                           (and (empty? candidates) (nil? e)))))))
 
