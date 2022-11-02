@@ -732,19 +732,24 @@
    :post-combiner     (maybe-unary f)})
 
 (deftransform into
-  "Adds all inputs to the given collection using conj. Ordering of elements
-  from distinct chunks is undefined.
+  "Adds all inputs to the given collection using conj in the reducer, then
+  `into` in the combiner. If executed concurrently, order of elements across
+  chunks is undefined. If coll supports transients, uses transients for
+  reduction passes.
 
       (t/tesser [[1 2 3] [4 5 6] [7 8 9]] (t/into []))
       ; => [7 8 9 1 2 3 4 5 6]"
   [coll]
   (assert (nil? downstream))
-  {:reducer-identity vector
-   :reducer          conj
-   :post-reducer     identity
-   :combiner-identity (constantly coll)
-   :combiner          core/into
-   :post-combiner     identity})
+  (let [t? (instance? clojure.lang.IEditableCollection coll)]
+    {:reducer-identity  (if t?
+                          (comp transient (constantly coll))
+                          (constantly coll))
+     :reducer           (if t? conj! conj)
+     :post-reducer      (if t? persistent! identity)
+     :combiner-identity (constantly coll)
+     :combiner          core/into
+     :post-combiner     identity}))
 
 (defwraptransform post-combine
   "Transforms the output of a fold by applying a function to it.
@@ -892,35 +897,52 @@
   (let [ks             (vec (keys fold-map))
         n              (core/count ks)
         folds          (mapv (comp compile-fold (partial get fold-map)) ks)
-        reducers       (mapv :reducer folds)
-        combiners      (mapv :combiner folds)]
-    ; We're gonna project into a particular key basis vector for the
-    ; reduce/combine steps
-    {:reducer-identity    (fn identity []
-                            (let [a (object-array n)]
-                              (dotimes [i n]
-                                (aset a i ((-> folds
-                                               (nth i)
-                                               :reducer-identity))))
-                              a))
-     :reducer             (fn reducer [^objects accs x]
-                            (dotimes [i n]
-                              (aset accs i ((nth reducers i) (aget accs i) x)))
-                            accs)
-     :post-reducer        identity
-     :combiner-identity   (if (core/empty? fold-map)
-                            vector
-                            (apply juxt (core/map :combiner-identity folds)))
-     :combiner            (fn combiner [accs1 accs2]
-                            (mapv (fn [f acc1 acc2] (f acc1 acc2))
-                                  combiners accs1 accs2))
-     ; Then inflate the vector back into a map
-     :post-combiner (comp (partial zipmap ks)
-                          ; After having applied the post-combiners
-                          (fn post-com [xs] (mapv (fn [f x] (f x))
-                                                  (core/map :post-combiner
-                                                            folds)
-                                                  xs)))}))
+        ; Function to make an array out of something extracted from folds
+        ary                  (fn [k] (object-array (core/map k folds)))
+        ; Materialize fns for speed, so we're not doing nth/get constantly
+        reducer-identities   (ary :reducer-identity)
+        reducers             (ary :reducer)
+        post-reducers        (ary :post-reducer)
+        combiner-identities  (ary :combiner-identity)
+        combiners            (ary :combiner)
+        post-combiners       (ary :post-combiner)
+        reducer (fn reducer
+                  ([]
+                   (let [acc (object-array n)]
+                     (dotimes [i n]
+                       (aset acc i ((aget reducer-identities i))))
+                     acc))
+                  ([^objects acc]
+                   (dotimes [i n]
+                     (aset acc i ((aget post-reducers i) (aget acc i))))
+                   (vec acc))
+                  ([^objects acc x]
+                   (dotimes [i n]
+                     (aset acc i ((aget reducers i) (aget acc i) x)))
+                   acc))
+        combiner (fn combiner
+                   ([]
+                    (let [acc (object-array n)]
+                      (dotimes [i n]
+                        (aset acc i ((aget combiner-identities i))))
+                      acc))
+                   ([^objects acc]
+                    ; Inflate back into a map
+                    (persistent!
+                      (areduce acc i m (transient {})
+                               (assoc! m (nth ks i) ((aget post-combiners i)
+                                                     (aget acc i))))))
+                   ([^objects acc1, acc2]
+                    (dotimes [i n]
+                      (aset acc1 i ((aget combiners i)
+                                    (aget acc1 i) (nth acc2 i))))
+                    acc1))]
+    {:reducer-identity  reducer
+     :reducer           reducer
+     :post-reducer      reducer
+     :combiner-identity combiner
+     :combiner          combiner
+     :post-combiner     combiner}))
 
 ;; Basic reductions
 
