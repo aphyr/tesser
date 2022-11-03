@@ -901,12 +901,12 @@
         ; Function to make an array out of something extracted from folds
         ary                  (fn [k] (object-array (core/map k folds)))
         ; Materialize fns for speed, so we're not doing nth/get constantly
-        reducer-identities   (ary :reducer-identity)
-        reducers             (ary :reducer)
-        post-reducers        (ary :post-reducer)
-        combiner-identities  (ary :combiner-identity)
-        combiners            (ary :combiner)
-        post-combiners       (ary :post-combiner)
+        reducer-identities   ^objects (ary :reducer-identity)
+        reducers             ^objects (ary :reducer)
+        post-reducers        ^objects (ary :post-reducer)
+        combiner-identities  ^objects (ary :combiner-identity)
+        combiners            ^objects (ary :combiner)
+        post-combiners       ^objects (ary :post-combiner)
         reducer (fn reducer
                   ([]
                    (let [acc (object-array n)]

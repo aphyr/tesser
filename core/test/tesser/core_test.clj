@@ -9,7 +9,7 @@
             [tesser.utils :refer :all]
             [tesser.core :as t]))
 
-(def test-opts {:num-tests 100
+(def test-opts {:num-tests 1000
                 :par 256})
 
 (prn test-opts)
