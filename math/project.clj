@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :dependencies [[tesser.core "1.0.6-SNAPSHOT"]
+  :dependencies [[tesser.core "1.0.6"]
 ;                 [com.tdunning/t-digest "3.0"]
                  [com.clearspring.analytics/stream "2.9.8"]
                  ; 2.1.10 changed quantiles; see https://github.com/HdrHistogram/HdrHistogram/issues/194
