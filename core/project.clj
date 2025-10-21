@@ -11,8 +11,8 @@
 ;             "-XX:+UnlockCommercialFeatures"
 ;             "-XX:+FlightRecorder"
              ]
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.12.0"]
-                                  [org.clojars.achim/multiset "0.1.1-SNAPSHOT"]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.12.3"]
+                                  [metametadata/multiset "0.1.1"]
                                   [criterium "0.4.6"]
                                   [org.clojure/test.check "1.1.1"]]
                    ; :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]

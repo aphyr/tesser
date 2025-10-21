@@ -11,7 +11,7 @@
                  [org.hdrhistogram/HdrHistogram "2.1.9"]
                  [org.clojure/math.combinatorics "0.3.0"]
                  [org.clojure/math.numeric-tower "0.1.0"]]
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.12.0"]
-                                  [org.clojars.achim/multiset "0.1.1-SNAPSHOT"]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.12.3"]
+                                  [metametadata/multiset "0.1.1"]
                                   [criterium "0.4.6"]
                                   [org.clojure/test.check "1.1.1"]]}})
