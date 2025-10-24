@@ -103,7 +103,7 @@ functions:
  :reducer           (fn [accumulator input] ...)
  :post-reducer      (fn [accumulator] ...)
  :combiner-identity (fn [] ...)
- :combiner          (fn [accumulator post-reducer-result])
+ :combiner          (fn [accumulator post-reducer-result] ...)
  :post-combiner     (fn [accumulator] ...)}
 ```
 
