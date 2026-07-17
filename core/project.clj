@@ -11,10 +11,10 @@
 ;             "-XX:+UnlockCommercialFeatures"
 ;             "-XX:+FlightRecorder"
              ]
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.12.3"]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.12.5"]
                                   [metametadata/multiset "0.1.1"]
                                   [criterium "0.4.6"]
-                                  [org.clojure/test.check "1.1.1"]]
+                                  [org.clojure/test.check "1.1.3"]]
                    ; :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
                    }}
   :test-selectors {:default #(not-any? % [:stress :bench])
