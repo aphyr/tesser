@@ -1,7 +1,11 @@
 | Clojars  | API docs | Purpose |
 |----------|----------|---------|
-| [![clojars badge](https://img.shields.io/clojars/v/tesser.core.svg)](https://clojars.org/tesser.core) | [![cljdoc badge](https://cljdoc.org/badge/tesser.core/tesser.core)](https://cljdoc.org/d/tesser.core/tesser.core) | The core library and essential folds |
-| [![clojars badge](https://img.shields.io/clojars/v/tesser.math.svg)](https://clojars.org/tesser.math) | [![cljdoc badge](https://cljdoc.org/badge/tesser.math/tesser.math)](https://cljdoc.org/d/tesser.math/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc.|
+| [![clojars badge](https://img.shields.io/clojars/v/com.aphyr/tesser.core.svg)](https://clojars.org/com.aphyr/tesser.core) | [![cljdoc badge](https://cljdoc.org/badge/com.aphyr/tesser.core)](https://cljdoc.org/d/com.aphyr/tesser.core) | The core library and essential folds |
+| [![clojars badge](https://img.shields.io/clojars/v/com/aphyr/tesser.math.svg)](https://clojars.org/com.aphyr/tesser.math) | [![cljdoc badge](https://cljdoc.org/badge/com.aphyr/tesser.math)](https://cljdoc.org/d/com.aphyr/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc.|
+
+**DEPENDENCY NAME CHANGE:** `tesser.core` and `tesser.math` are moving to
+`com.aphyr/tesser.core` and `com.aphyr/tesser.math`. Same maintainer, just a
+new Maven group name.
 
 # Tesser
 
