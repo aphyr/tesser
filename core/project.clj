@@ -1,4 +1,4 @@
-(defproject com.aphyr/tesser.core "1.0.10"
+(defproject com.aphyr/tesser.core "1.0.11-SNAPSHOT"
   :description "Composable concurrent folds for Clojure."
   :url "https://github.com/aphyr/tesser"
   :scm {:dir ".."}

@@ -1,4 +1,4 @@
-(defproject com.aphyr/tesser.math "1.0.10"
+(defproject com.aphyr/tesser.math "1.0.11-SNAPSHOT"
   :description "Concurrent folds for statistical analysis"
   :url "https://github.com/aphyr/tesser"
   :scm {:dir ".."}
