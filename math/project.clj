@@ -1,6 +1,7 @@
 (defproject com.aphyr/tesser.math "1.0.10-SNAPSHOT"
   :description "Concurrent folds for statistical analysis"
-  :url "http://github.com/aphyr/tesser"
+  :url "https://github.com/aphyr/tesser"
+  :scm {:dir ".."}
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
