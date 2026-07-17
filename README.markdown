@@ -1,7 +1,7 @@
-| API docs | Clojars | Purpose |
-|----------|---------|---------|
-| [tesser.core](http://aphyr.github.io/tesser/tesser.core.html) | [tesser.core](https://clojars.org/tesser.core) | The core library and essential folds |
-| [tesser.math](http://aphyr.github.io/tesser/tesser.math.html) | [tesser.math](https://clojars.org/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc. |
+| Clojars  | API docs | Purpose |
+|----------|----------|---------|
+| [![clojars badge](https://img.shields.io/clojars/v/tesser.core.svg)](https://clojars.org/tesser.core) | [![cljdoc badge](https://cljdoc.org/badge/tesser.core/tesser.core)](https://cljdoc.org/d/tesser.core/tesser.core) | The core library and essential folds |
+| [![clojars badge](https://img.shields.io/clojars/v/tesser.math.svg)](https://clojars.org/tesser.math) | [![cljdoc badge](https://cljdoc.org/badge/tesser.math/tesser.math)](https://cljdoc.org/d/tesser.math/tesser.math) | Statistical folds: means, correlations, covariance matrices, quantiles, etc.|
 
 # Tesser
 
